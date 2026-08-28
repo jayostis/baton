@@ -5,7 +5,7 @@ whether the spec is any *good* — that is [`groom`](groom.md), where a human is
 
 So a clean pass means one narrow, true thing: **this issue is shaped right.** It is not a
 statement that the issue is correct, achievable or worth doing, and nothing about it substitutes
-for `agent-ready`.
+for a person reading the spec.
 
 [The template](../../references/agent-ready.yml) is the definition of a well-formed
 issue and **is not restated here.** Read it, check the issue against it, and report the gaps.

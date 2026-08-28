@@ -9,7 +9,9 @@ pass's findings are the maintainer's, not another round's input.
 ## The loop
 
 - **a. Review** — [`/baton:pr review <pr>`](review.md).
-- **b. Decide** — nothing found, or that was the last allowed pass → **stop**.
+- **b. Decide** — `review` reported a pass, or that was the last allowed pass → **stop**.
+  `review` **blocked** — it never ran, or it found things it could not post → **stop**, carrying
+  its reason verbatim. A blocked review has not cleared anything.
 - **c. Apply** — spawn
   [`pr-review-followup-agent`](../../agents/quality/pr-review-followup-agent.md) with the PR number
   **and nothing else**. Anything unfixed → **stop**. Pushed nothing → **stop**: the head has not
@@ -27,8 +29,9 @@ PR, not your stdout. Carry it to the exit as unfixed.
 - `stalled <pr> after <n> passes` — an apply pushed nothing; the head did not move.
 - `exhausted <pr> after <n> passes` — the cap was reached with findings still open.
 - `unfixed <pr> — <what the apply agent could not settle, verbatim>`
+- `blocked <pr> — <why the review could not be trusted, verbatim>`
 
-**Only `unfixed` is a failure**, and even then this verb neither labels nor escalates — `pr` verbs
+**`unfixed` and `blocked` are the failures**, and even then this verb neither labels nor escalates — `pr` verbs
 touch the PR and never the issue. Whoever called it decides what that means.
 
 ## Report

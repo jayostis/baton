@@ -68,8 +68,8 @@ A chain that yields nobody still blocks, and says in the comment that no owner w
 - **The issue template.** [`references/agent-ready.yml`](references/agent-ready.yml) is the canonical
   copy and the thing `/baton:issue review` checks against. For GitHub to render the form, a project
   needs its own at `.github/ISSUE_TEMPLATE/agent-ready.yml`. Don't let the two drift.
-- **Two labels.** `agent-ready` (the maintainer's signal that a spec was read) and `needs-rework`.
-  `/baton:deliver` blocks without the first.
+- **One label.** `needs-rework` — the maintainer's explicit stop. `/baton:deliver` blocks on it.
+  No positive label is required: an issue is deliverable unless something says otherwise.
 - **A Delivery block** on each issue naming the integration branch and the work branch. `deliver`
   never infers either — a derived name changes when the title is reworded, and the re-run then forks
   a second branch off the base.

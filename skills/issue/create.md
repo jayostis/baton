@@ -35,4 +35,4 @@ well to a human and names its sections differently is unreadable to both.
 Then [`review`](review.md) it. The conformance pass is free and catches a required field you both
 talked past.
 
-**Never apply `agent-ready`** — see [`SKILL.md`](SKILL.md). Milestone and labels are the maintainer's.
+**Never apply a label** — see [`SKILL.md`](SKILL.md). Milestone and labels are the maintainer's.

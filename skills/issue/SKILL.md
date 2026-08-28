@@ -26,9 +26,9 @@ the room, and neither runs without them asking.
 **No default.** Given a bare `/baton:issue <n>`, do [`review`](review.md), then say the verb was
 missing. `review` only reads; the shorter thing to type must not be the one that acts.
 
-## No verb applies `agent-ready`
+## No verb approves a spec
 
 **A grooming pass an agent both performs and accepts is not a gate.** `review` cannot approve
 anything: conforming to a template says nothing about being right. `create` and `groom` could, and
-must not — the maintainer confers the label, having written or argued the spec rather than merely
-read it.
+must not — judging a spec sound is the maintainer's, having written or argued it rather than
+merely read it.

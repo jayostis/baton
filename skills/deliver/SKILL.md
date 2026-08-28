@@ -1,6 +1,6 @@
 ---
 name: deliver
-description: Take an agent-ready issue to a reviewed PR, verified locally, taken out of draft and left with a checklist for the maintainer — verify the spec, failing tests first, implementation, review on the diff. Never asks in-session; escalates to GitHub with a label and an @mention. Never merges. Use when someone names an issue to work hands-off, or when called from a workflow.
+description: Take an issue to a reviewed PR, verified locally, taken out of draft and left with a checklist for the maintainer — verify the spec, failing tests first, implementation, review on the diff. Never asks in-session; escalates to GitHub with a label and an @mention. Never merges. Use when someone names an issue to work hands-off, or when called from a workflow.
 ---
 
 # /baton:deliver &lt;issue#&gt; [--worktree]
@@ -62,8 +62,11 @@ genuinely missing; don't redo a committed red test just because it comes earlier
 **1 — Verify the issue.** `gh issue view N --json labels,title,body,assignees,author`.
 The last two feed the escalation chain above; fetching them here costs no extra round trip.
 
-- `needs-rework`, or no `agent-ready` → **block.** Both are the maintainer's signals, and every step below is
-  built on a spec no one read if you proceed without them.
+- `needs-rework` → **block.** It is the maintainer's explicit stop, and every step below is built
+  on a spec they have said is not ready.
+
+**No positive label is required.** An issue is deliverable unless something says otherwise; the
+conformance pass below is the gate, not a badge somebody remembered to apply.
 
 Then [`/baton:issue review <N>`](../issue/review.md) — **block on what it blocks on**, quoting it.
 
@@ -167,7 +170,7 @@ conditions.
 
 **Branch on its exit line**, and on nothing else:
 
-- `unfixed` → **block**, quoting it verbatim.
+- `unfixed` or `blocked` → **block**, quoting it verbatim.
 - `clean`, `stalled` or `exhausted` → **go to Checklist**.
 
 **8 — Checklist.** Spawn
