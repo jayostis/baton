@@ -27,6 +27,15 @@
       "description": "Run with the work staged before pushing review fixes, e.g. 'npm run precommit'. Leave blank if the project has no gate — agents then report the targeted test run alone.",
       "required": false
     },
+    "review_passes": {
+      "type": "number",
+      "title": "Review passes",
+      "description": "How many review passes /baton:pr loop runs before stopping. A pass is a review, so 2 means review, apply, review. Raising it buys false positives more than findings.",
+      "default": 2,
+      "min": 1,
+      "max": 5,
+      "required": false
+    },
     "review_command": {
       "type": "string",
       "title": "PR review wrapper command",

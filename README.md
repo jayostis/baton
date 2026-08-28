@@ -52,6 +52,7 @@ All four keys are optional; the defaults work in a normal GitHub repo.
 | `escalation_label` | `needs-human` | Applied to the issue on a block. **Must already exist in the repo.** |
 | `verify_command` | — | Pre-commit gate, run with work staged before pushing review fixes. Blank → agents report the targeted test run alone and say no gate ran. |
 | `review_command` | — | Project wrapper for the PR reviewer. Blank → the bundled `/code-review`. |
+| `review_passes` | `2` | Review passes in `/baton:pr loop` — review, apply, review. `--passes n` overrides per run. |
 
 **Who gets the @mention** — first hit wins, so `maintainer_handle` is a backstop rather than a setting
 you need:
