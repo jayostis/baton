@@ -13,32 +13,12 @@
 //   4  unproven   ran, but what it produced and what the PR holds disagree
 //   5  inspected  --dry-run or --no-post: nothing was posted, nothing is proven
 
-import { spawnSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
+import { run as realRun, isMain } from './lib/exec.mjs'
 import { appendRun as writeRun } from './lib/runlog.mjs'
 
 const EXIT = { CLEAN: 0, FINDINGS: 1, PREFLIGHT: 2, DENIED: 3, UNPROVEN: 4, INSPECTED: 5 }
 const LEVELS = ['low', 'medium', 'high', 'max']
-
-// argv arrays only, shell never. A command is never a string, so nothing parses
-// one: no quoting rules, no `&&`, no `$(...)`, nothing to differ by platform.
-//
-// There is deliberately no `shell: true` fallback for a missing executable.
-// Node concatenates argv unescaped under that option -- it warns as much -- so
-// the retry that was here mangled every argument containing a space or a pipe,
-// which is all of them. A clear failure beats a silently corrupted command.
-function run(cmd, args, { cwd } = {}) {
-  const r = spawnSync(cmd, args, {
-    encoding: 'utf8',
-    shell: false,
-    cwd,
-    maxBuffer: 64 * 1024 * 1024, // a review envelope blows the 1 MiB default
-  })
-  if (r.error?.code === 'ENOENT') {
-    return { ok: false, missing: cmd, code: null, stdout: '', stderr: `${cmd} is not on PATH, or is a shim this cannot execute directly` }
-  }
-  return { ok: !r.error && r.status === 0, code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '', error: r.error }
-}
 
 // A failed write must never change the verdict of the run it is recording.
 function appendRun(opts, d) {
@@ -78,24 +58,24 @@ function parseArgs(argv) {
   return out
 }
 
-function threadIds(repo, pr, cwd) {
+function threadIds(run, repo, pr, cwd) {
   const r = run('gh', ['api', '--paginate', `repos/${repo}/pulls/${pr}/comments`,
     '--jq', '.[] | select(.in_reply_to_id == null) | .id'], { cwd })
   if (!r.ok) return null
-  return new Set(r.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean))
+  return new Set(r.out.split(/\r?\n/).map(s => s.trim()).filter(Boolean))
 }
 
 // The reviewer resolves a bare PR number against its own working directory, so
 // the directory IS the target. --repo does not redirect it; it asserts what the
 // directory had better be. Getting this wrong reviews someone else's code and
 // reports clean, which is what the first run of this script did.
-function preflight(opts) {
+function preflight(run, opts) {
   const auth = run('gh', ['auth', 'status'], { cwd: opts.dir })
-  if (!auth.ok) return { failed: auth.missing ? auth.stderr : 'gh is not authenticated', detail: auth.stderr.trim() }
+  if (!auth.ok) return { failed: auth.missing ? auth.err : 'gh is not authenticated', detail: auth.err.trim() }
 
   const r = run('gh', ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'], { cwd: opts.dir })
-  if (!r.ok) return { failed: `${opts.dir} is not a checkout of a GitHub repository`, detail: r.stderr.trim() }
-  const repo = r.stdout.trim()
+  if (!r.ok) return { failed: `${opts.dir} is not a checkout of a GitHub repository`, detail: r.err.trim() }
+  const repo = r.out.trim()
 
   if (opts.repo && opts.repo !== repo) {
     return {
@@ -106,9 +86,9 @@ function preflight(opts) {
 
   const pr = run('gh', ['pr', 'view', opts.pr, '--json', 'headRefOid,url,state,title',
     '--jq', '[.headRefOid, .url, .state, .title] | @tsv'], { cwd: opts.dir })
-  if (!pr.ok) return { failed: `PR #${opts.pr} is not reachable in ${repo}`, detail: pr.stderr.trim() }
+  if (!pr.ok) return { failed: `PR #${opts.pr} is not reachable in ${repo}`, detail: pr.err.trim() }
 
-  const [head, url, state, title] = pr.stdout.trim().split('\t')
+  const [head, url, state, title] = pr.out.split('\t')
   return { repo, head, url, state, title }
 }
 
@@ -140,8 +120,9 @@ function claimedFindings(result) {
   return m ? Number(m[1]) : null
 }
 
-function main() {
-  const opts = parseArgs(process.argv.slice(2))
+export function main(argv = process.argv.slice(2), deps = {}) {
+  const run = deps.run ?? realRun
+  const opts = parseArgs(argv)
   if (opts.error) {
     console.error(`pr-review: ${opts.error}`)
     console.error(`usage: pr-review.mjs --pr <n> --level <${LEVELS.join('|')}> [--dir <checkout>] [--repo owner/name]`)
@@ -149,11 +130,11 @@ function main() {
     return EXIT.PREFLIGHT
   }
 
-  const pre = preflight(opts)
+  const pre = preflight(run, opts)
   if (pre.failed) { report(opts, { outcome: 'preflight', reason: pre.failed, detail: pre.detail }); return EXIT.PREFLIGHT }
   if (pre.state !== 'OPEN') { report(opts, { outcome: 'preflight', reason: `PR #${opts.pr} is ${pre.state}, not open` }); return EXIT.PREFLIGHT }
 
-  const before = threadIds(pre.repo, opts.pr, opts.dir)
+  const before = threadIds(run, pre.repo, opts.pr, opts.dir)
   if (before === null) { report(opts, { outcome: 'preflight', reason: 'could not read existing review threads' }); return EXIT.PREFLIGHT }
 
   // The level goes first. Claude Code reads the level, then the flags, and
@@ -188,17 +169,17 @@ function main() {
   const proc = run('claude', claudeArgs, { cwd: opts.dir })
   const elapsedMs = Date.now() - started
 
-  if (proc.missing) { report(opts, { ...base, outcome: 'preflight', reason: proc.stderr }); return EXIT.PREFLIGHT }
+  if (proc.missing) { report(opts, { ...base, outcome: 'preflight', reason: proc.err }); return EXIT.PREFLIGHT }
 
   let envelope
-  try { envelope = JSON.parse(proc.stdout) } catch {
-    report(opts, { ...base, outcome: 'unproven', reason: 'the reviewer produced no parseable JSON envelope', detail: (proc.stderr || proc.stdout).slice(0, 800), exitCode: proc.code })
+  try { envelope = JSON.parse(proc.raw) } catch {
+    report(opts, { ...base, outcome: 'unproven', reason: 'the reviewer produced no parseable JSON envelope', detail: (proc.err || proc.raw).slice(0, 800), exitCode: proc.code })
     return EXIT.UNPROVEN
   }
   if (opts.save) writeFileSync(opts.save, JSON.stringify(envelope, null, 2))
 
   const denials = Array.isArray(envelope.permission_denials) ? envelope.permission_denials : []
-  const after = threadIds(pre.repo, opts.pr, opts.dir)
+  const after = threadIds(run, pre.repo, opts.pr, opts.dir)
   const added = after === null ? null : [...after].filter(id => !before.has(id))
   const result = typeof envelope.result === 'string' ? envelope.result : ''
 
@@ -264,4 +245,4 @@ function report(opts, d) {
 
 // process.exit() can truncate unflushed stdout on a pipe, and the DENIED path
 // prints the only surviving copy of the findings.
-process.exitCode = main()
+if (isMain(import.meta.url)) process.exitCode = main()
