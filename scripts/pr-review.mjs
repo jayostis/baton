@@ -14,9 +14,8 @@
 //   5  inspected  --dry-run or --no-post: nothing was posted, nothing is proven
 
 import { spawnSync } from 'node:child_process'
-import { writeFileSync, appendFileSync, mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { writeFileSync } from 'node:fs'
+import { appendRun as writeRun } from './lib/runlog.mjs'
 
 const EXIT = { CLEAN: 0, FINDINGS: 1, PREFLIGHT: 2, DENIED: 3, UNPROVEN: 4, INSPECTED: 5 }
 const LEVELS = ['low', 'medium', 'high', 'max']
@@ -41,54 +40,20 @@ function run(cmd, args, { cwd } = {}) {
   return { ok: !r.error && r.status === 0, code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '', error: r.error }
 }
 
-// Every run leaves a record, without being asked to. An audit that reads only
-// what someone remembered to save reports impressions; one that reads a log
-// reports facts. The write is machine-made and free, which is the half a
-// hand-kept friction log always gets wrong -- the other half is draining it,
-// and that is the auditor's job, not this file's.
-function runLogPath(repo) {
-  const base = process.env.BATON_HOME || process.env.CLAUDE_PLUGIN_DATA || join(homedir(), '.claude', 'baton')
-  const dir = join(base, 'runs')
-  mkdirSync(dir, { recursive: true })
-  return join(dir, `${String(repo || 'unknown').replace(/[^A-Za-z0-9._-]/g, '__')}.jsonl`)
-}
-
 // A failed write must never change the verdict of the run it is recording.
 function appendRun(opts, d) {
   if (opts.noLog || opts.dryRun) return null
-  const record = {
-    schema: 1,
-    ts: new Date().toISOString(),
-    outcome: d.outcome,
-    exit: EXIT[String(d.outcome).toUpperCase()] ?? null,
-    reason: d.reason ?? null,
-    repo: d.repo ?? opts.repo ?? null,
-    pr: d.pr ?? opts.pr,
-    head: d.head ?? null,
-    dir: d.dir ?? opts.dir,
-    levelAsked: d.levelAsked ?? opts.level,
-    levelSeen: d.levelSeen ?? null,
-    denials: d.denials ?? null,
-    deniedTools: d.deniedTools ?? null,
-    recovered: d.recovered?.length ?? null,
-    threadsBefore: d.threadsBefore ?? null,
-    threadsAdded: d.threadsAdded ?? null,
-    claimed: d.claimed ?? null,
-    elapsedMs: d.elapsedMs ?? null,
-    costUsd: d.costUsd ?? null,
-    usage: d.usage ?? null,
-    noPost: opts.noPost,
-    // Truncated on purpose: the log is evidence for an audit, not an archive.
-    // --save keeps the whole envelope when a run is worth preserving in full.
+  return writeRun('pr-review', d.repo ?? opts.repo, {
+    outcome: d.outcome, exit: EXIT[String(d.outcome).toUpperCase()] ?? null, reason: d.reason ?? null,
+    pr: d.pr ?? opts.pr, head: d.head ?? null, dir: d.dir ?? opts.dir,
+    levelAsked: d.levelAsked ?? opts.level, levelSeen: d.levelSeen ?? null,
+    denials: d.denials ?? null, deniedTools: d.deniedTools ?? null, recovered: d.recovered?.length ?? null,
+    threadsBefore: d.threadsBefore ?? null, threadsAdded: d.threadsAdded ?? null, claimed: d.claimed ?? null,
+    elapsedMs: d.elapsedMs ?? null, costUsd: d.costUsd ?? null, usage: d.usage ?? null, noPost: opts.noPost,
+    // Truncated on purpose: evidence for an audit, not an archive. --save keeps
+    // the whole envelope when a run is worth preserving in full.
     resultExcerpt: typeof d.result === 'string' ? d.result.slice(0, 4000) : null,
-  }
-  try {
-    const path = runLogPath(record.repo)
-    appendFileSync(path, JSON.stringify(record) + '\n')
-    return path
-  } catch {
-    return null
-  }
+  })
 }
 
 function parseArgs(argv) {

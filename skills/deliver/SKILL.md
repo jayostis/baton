@@ -69,34 +69,24 @@ Block unless all three hold:
 
 The work branch need not exist yet. `Escalate to:` is optional and blocks on nothing.
 
-**3 — Branch.** The work goes in the checkout you are in; `--worktree` puts it in its own instead.
-Either way the branch is the `Work branch`, verbatim.
+**3 — Branch.**
 
 ```bash
-git fetch origin
-git status --porcelain                        # dirty → block
-git ls-remote --heads origin <work branch>
+node ${CLAUDE_PLUGIN_ROOT}/scripts/branch.mjs \
+  --work <work branch> --base <integration branch> [--worktree .claude/worktrees/<name>]
 ```
 
-- here → `git switch <work branch>`
-- only on origin → `git switch --track origin/<work branch>`
-- neither → `git switch -c <work branch> origin/<integration branch>`
+| exit | | do |
+|---|---|---|
+| **0** `ready` | on the branch, reconciled against origin | continue — the report names the cwd |
+| **2** `preflight` | not a repo, fetch failed, base absent | **block** |
+| **3** `dirty` | uncommitted changes a switch would drag onto the delivery | **block** |
+| **4** `diverged` | local and origin both moved | **block** — two attempts ran; picking a side discards one |
 
-With `--worktree`, `git worktree list` first. `<name>` is the work branch past its first `/`.
-
-- **already inside one** (`git rev-parse --git-dir` ≠ `--git-common-dir`) → stay, and reconcile
-- **one here for this branch** → `EnterWorktree` with `path`, then reconcile
-- **on origin, none here** →
-  `git worktree add --track -b <work branch> .claude/worktrees/<name> origin/<work branch>`.
-  Not plain `-b`: that forks off the base and strips what is already pushed.
-- **neither** → `git worktree add -b <work branch> .claude/worktrees/<name> origin/<integration branch>`
-
-**Reconcile:** `git rev-list --left-right --count origin/<work branch>...HEAD` → `behind ahead`.
-Behind → fast-forward. Ahead → keep it. **Both → diverged: block**, two attempts ran and picking a
-side discards one. Exit 128 → no branch on origin; all of it is unpushed, keep it.
-
-**Never `ExitWorktree`** — leave it for the maintainer. `EnterWorktree` alone cannot take a base,
-so it would silently ignore the integration branch.
+`--worktree` gives the delivery its own checkout, which is what lets two run at once. `<name>` is
+the work branch past its first `/`. **The script creates it; `EnterWorktree` with the path the
+report names is how you get into it** — `EnterWorktree` alone cannot take a base, so it must never
+be the thing that creates one. **Never `ExitWorktree`** — leave it for the maintainer.
 
 **A skill or agent this branch adds is not live in this session** — discovery is a session-start
 snapshot, and neither `EnterWorktree` nor `git switch` re-scans.
