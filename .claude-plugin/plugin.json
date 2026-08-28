@@ -3,10 +3,19 @@
   "displayName": "Baton",
   "description": "An issue spec to a reviewed PR by deliberate handoff — each stage blind to the last, so no agent can quietly redefine done. Never merges.",
   "version": "1.0.0",
-  "author": { "name": "jayostis" },
+  "author": {
+    "name": "jayostis"
+  },
   "repository": "https://github.com/jayostis/baton",
   "license": "MIT",
-  "keywords": ["workflow", "github", "issues", "pull-requests", "code-review", "tdd"],
+  "keywords": [
+    "workflow",
+    "github",
+    "issues",
+    "pull-requests",
+    "code-review",
+    "tdd"
+  ],
   "userConfig": {
     "maintainer_handle": {
       "type": "string",
@@ -34,12 +43,6 @@
       "default": 2,
       "min": 1,
       "max": 5,
-      "required": false
-    },
-    "review_command": {
-      "type": "string",
-      "title": "PR review wrapper command",
-      "description": "Project wrapper for the PR reviewer, e.g. 'npm run pr:review'. Leave blank to use the bundled /code-review.",
       "required": false
     }
   }

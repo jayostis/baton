@@ -23,12 +23,11 @@ maintainer's, not another round's input.
 
 ## The loop
 
-- **a. Review** — [`/baton:pr review <pr>`](review.md).
-- **b. Decide** — `review` reported a pass, or that was the last allowed pass → **stop**.
-  `review` **blocked** — it never ran, ran at the wrong level, could not post, or did not read
-  what changed → **stop**, carrying its reason verbatim **and any findings it recovered**. A
-  blocked review has cleared nothing, and a blocked pass whose findings do not travel with the
-  exit is a review nobody gets to act on.
+- **a. Review** — [`/baton:pr review <pr>`](review.md). **Branch on its exit code, nothing else.**
+- **b. Decide** — `0` clean, or that was the last allowed pass → **stop**. `2`, `3` or `4` →
+  **stop**, carrying the reason verbatim **and any findings it recovered**: a blocked review has
+  cleared nothing, and a blocked pass whose findings do not travel with the exit is a review
+  nobody gets to act on.
 - **c. Apply** — spawn
   [`pr-review-followup-agent`](../../agents/quality/pr-review-followup-agent.md) with the PR number
   **and nothing else**. Anything unfixed → **stop**. Pushed nothing → **stop**: the head has not

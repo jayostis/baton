@@ -51,7 +51,6 @@ All four keys are optional; the defaults work in a normal GitHub repo.
 | `maintainer_handle` | — | Fallback @mention when a delivery blocks. Normally never reached (see below). |
 | `escalation_label` | `needs-human` | Applied to the issue on a block. **Must already exist in the repo.** |
 | `verify_command` | — | Pre-commit gate, run with work staged before pushing review fixes. Blank → agents report the targeted test run alone and say no gate ran. |
-| `review_command` | — | Project wrapper for the PR reviewer. Blank → the bundled `/code-review`. |
 | `review_passes` | `2` | Review passes in `/baton:pr loop` — review, apply, review. `--passes n` overrides per run. |
 
 **Who gets the @mention** — first hit wins, so `maintainer_handle` is a backstop rather than a setting
@@ -71,13 +70,10 @@ A chain that yields nobody still blocks, and says in the comment that no owner w
   needs its own at `.github/ISSUE_TEMPLATE/agent-ready.yml`. Don't let the two drift.
 - **One label.** `needs-rework` — the maintainer's explicit stop. `/baton:deliver` blocks on it.
   No positive label is required: an issue is deliverable unless something says otherwise.
-- **A reviewer that can reach the PR.** `/baton:pr review` checks `gh auth status` and that the
-  PR is reachable before it spawns anything, and blocks rather than reviewing if either fails.
-  Driven headless it grants the shell tools whole — `Bash` and `PowerShell` by bare name, since a
-  prefix pattern cannot match composed shell and cannot reach `PowerShell` at all — denies `Write`,
-  `Edit` and `NotebookEdit` to carry its own no-files contract, and blocks on a non-empty
-  `permission_denials` array. `claude -p` exits `0` with `"is_error": false` when every tool call
-  was denied; that array is the only record.
+- **`gh`, authenticated, and a checkout of the repo that owns the PR.**
+  `scripts/pr-review.mjs` checks both before it spawns anything and refuses rather than reviewing
+  the wrong thing. Nothing else to configure: the tool grants a headless reviewer needs are
+  arguments the script passes, not settings you maintain.
 - **Review tuning in `CLAUDE.md`, not `REVIEW.md`.** The managed Code Review service reads
   `REVIEW.md`; the local `/code-review` this calls does not — it follows `CLAUDE.md` like any
   session. A **re-review convergence** rule is the one most worth having, since it targets the same
