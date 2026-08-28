@@ -80,27 +80,45 @@ of what has been run; never read it as one, and never let an omitted level stand
 ### Driving it headless
 
 Where this is scripted rather than typed — `claude -p` — permission denials are the failure mode,
-and they do not announce themselves in the exit code. **Declare the surface and read the ledger:**
+and they do not announce themselves in the exit code.
 
 ```bash
 claude -p "/code-review <level> <pr> --comment" \
   --output-format json \
   --permission-mode dontAsk \
-  --allowedTools "Read" "Grep" "Glob" "Bash(gh pr view:*)" "Bash(gh pr diff:*)" "Bash(gh api:*)"
+  --allowedTools Read Grep Glob Bash PowerShell \
+  --disallowedTools Write Edit NotebookEdit
 ```
 
-`dontAsk` turns a prompt that nobody can answer into an immediate denial rather than a silent
-fall-through. The allowlist is a starting surface, not a guarantee — a project may need more.
+**The shell tools are granted whole, by bare name, and that is a real grant** — arbitrary shell on
+the machine this runs on. Say it plainly rather than implying a curated list is achievable. Two
+reasons a narrower one is not, both structural rather than tunable:
 
-**Which is why the ledger, not the list, is the check:**
+- **A prefix pattern matches a command string, and the reviewer composes shell.** `Bash(gh api:*)`
+  does not match `SHA=$(gh pr view …) && gh api …`, so a command whose every constituent is allowed
+  is still denied. Assignments, `$(…)`, `&&`, `;` and pipes all defeat it.
+- **The tool depends on the platform.** On Windows the reviewer reaches for `PowerShell`, which no
+  `Bash(…)` pattern can reach at all. A Bash-only surface denies most of what it does there.
+
+**`--disallowedTools` is what carries the contract.** Deny rules are evaluated before the permission
+mode and before any allow rule, so they hold. This verb changes no files and touches no branch;
+those three entries are that sentence made enforceable. They are defence in depth, not a sandbox —
+a deny pattern scoped inside `Bash(…)` is defeated by composition exactly as an allow pattern is,
+which is why these are bare tool names.
+
+`dontAsk` turns a prompt nobody can answer into an immediate denial rather than a silent
+fall-through.
+
+**The ledger is still the check:**
 
 ```bash
 jq '.permission_denials | length'
 ```
 
-**Non-zero → block.** That catches the permissions nobody thought to allow, which is the whole
-point: you do not have to enumerate correctly in advance, you have to refuse to report success when
-something was denied.
+**Non-zero → block.** With the shells granted it no longer fires on ordinary review work — reading
+a sibling checkout, running a test to check a claim. It fires on the reviewer trying to write a
+file, reach an MCP tool this session does not have, or use anything outside the granted set. That
+is what it is for: not a mis-tuned list, but a review silently prevented from doing its job.
 
 `--comment` posts each finding as its own inline thread — anchored, unresolved — which is what
 [`comments`](comments.md) lists and [`followup`](followup.md) acts on. **Pass it always**, and see
@@ -135,6 +153,28 @@ findings, always to check the run against what you asked for:
 and succeeding on others in one run, which leaves threads on the PR and findings that reached
 nothing. Threads present is not threads complete; the count the reviewer reports is what you check
 against.
+
+### Recovering a pass that could not post
+
+**Blocking is right and it is not enough.** A review that could not post has still done the work,
+and dropping it discards the whole pass. Salvage what exists, in this order, and say which it was:
+
+- **A denied post carries its finding, verbatim.** In the JSON, `permission_denials[].tool_input`
+  holds the command the reviewer was blocked from running — for a `gh api …/comments` call that is
+  the complete body: file, line, side, argument. Fully recoverable.
+- **Its limit, which must be stated when you use it:** only *attempted* posts are there, and a
+  reviewer that is denied once tends to stop trying and switch to prose. A four-finding pass has
+  been seen leaving **one** in the ledger.
+- **`.result` is a summary, not a ledger.** It describes some findings and characterises the rest
+  in a clause — *"two in the drift script's error reporting"* is not a finding and nobody can act
+  on it. There is no findings array anywhere in the JSON; `.result` is the whole of it.
+
+**Report every finding you recovered, in full, and name the ones you could not** — plainly, as
+unrecoverable, with a re-run as the only remedy. A count is not a hand-off.
+
+**This is the failure path only.** A pass that posted is still reported from the threads and
+nothing else. Harvesting findings out of the receipt on a successful run reintroduces exactly what
+this section forbids: an agent reporting a review the PR cannot corroborate.
 
 **The exit code separates none of this.** The bundled reviewer runs inside `claude -p`, and a
 session that explains why it cannot proceed has completed successfully by its own lights: exit `0`,

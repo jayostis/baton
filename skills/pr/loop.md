@@ -26,7 +26,9 @@ maintainer's, not another round's input.
 - **a. Review** — [`/baton:pr review <pr>`](review.md).
 - **b. Decide** — `review` reported a pass, or that was the last allowed pass → **stop**.
   `review` **blocked** — it never ran, ran at the wrong level, could not post, or did not read
-  what changed → **stop**, carrying its reason verbatim. A blocked review has cleared nothing.
+  what changed → **stop**, carrying its reason verbatim **and any findings it recovered**. A
+  blocked review has cleared nothing, and a blocked pass whose findings do not travel with the
+  exit is a review nobody gets to act on.
 - **c. Apply** — spawn
   [`pr-review-followup-agent`](../../agents/quality/pr-review-followup-agent.md) with the PR number
   **and nothing else**. Anything unfixed → **stop**. Pushed nothing → **stop**: the head has not
@@ -41,7 +43,7 @@ maintainer's, not another round's input.
 - `stalled <pr> after <n> passes` — an apply pushed nothing; the head did not move.
 - `exhausted <pr> after <n> passes` — the cap was reached with findings still open.
 - `unfixed <pr> — <what the apply agent could not settle, verbatim>`
-- `blocked <pr> — <why the review could not be trusted, verbatim>`
+- `blocked <pr> — <why the review could not be trusted, verbatim, plus every finding recovered>`
 
 **`clean` asserts coverage, not just silence.** Where the last review's scope did not reach every
 file changed since the pass before it, the exit names the gap rather than claiming a clean PR.

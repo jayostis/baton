@@ -73,10 +73,11 @@ A chain that yields nobody still blocks, and says in the comment that no owner w
   No positive label is required: an issue is deliverable unless something says otherwise.
 - **A reviewer that can reach the PR.** `/baton:pr review` checks `gh auth status` and that the
   PR is reachable before it spawns anything, and blocks rather than reviewing if either fails.
-  Driven headless it declares its tool surface — `--permission-mode dontAsk` with an explicit
-  `--allowedTools` — and blocks on a non-empty `permission_denials` array in the JSON output.
-  `claude -p` exits `0` with `"is_error": false` when every tool call was denied; that array is
-  the only record, so the allowlist does not have to be right in advance.
+  Driven headless it grants the shell tools whole — `Bash` and `PowerShell` by bare name, since a
+  prefix pattern cannot match composed shell and cannot reach `PowerShell` at all — denies `Write`,
+  `Edit` and `NotebookEdit` to carry its own no-files contract, and blocks on a non-empty
+  `permission_denials` array. `claude -p` exits `0` with `"is_error": false` when every tool call
+  was denied; that array is the only record.
 - **Review tuning in `CLAUDE.md`, not `REVIEW.md`.** The managed Code Review service reads
   `REVIEW.md`; the local `/code-review` this calls does not — it follows `CLAUDE.md` like any
   session. A **re-review convergence** rule is the one most worth having, since it targets the same
