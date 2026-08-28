@@ -17,25 +17,19 @@ that does not survive contact with the code is one you **report**, not one you q
 
 ## Input
 
-`pr`, and nothing else. Everything is derived from it.
+`pr`, and nothing else.
 
 ## 1 — Derive the work list
 
 ```bash
-OWNER=$(gh repo view --json owner --jq .owner.login)
-NAME=$(gh repo view --json name --jq .name)
-gh api graphql -F owner="$OWNER" -F name="$NAME" -F pr=<pr> -f query='
-  query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){
-    pullRequest(number:$pr){reviewThreads(first:100){nodes{id isResolved isOutdated path line
-      comments(first:10){nodes{body}}}}}}}'
+node ${CLAUDE_PLUGIN_ROOT}/scripts/threads.mjs list --pr <pr>
 ```
 
-Your work is **every thread with `isResolved: false`.** Keep each `id`; step 3 needs it.
+Returns every unresolved thread — `id`, `path`, `line`, `outdated`, comments — plus the review
+summary bodies, which carry no thread and so close only by being reported in step 6.
 
-**`isOutdated` is not a filter.** GitHub sets it when the anchor line changes, which says nothing
-about whether the finding holds. An outdated thread has `line: null`; `original_line` from
-`gh api repos/:owner/:repo/pulls/<pr>/comments` is the only pointer to where it was raised. Read
-the file and decide which case you are in:
+**`outdated` is not a filter, it is a fact about the anchor.** GitHub sets it when the anchor line
+changes, which says nothing about whether the finding holds. Read the file and decide:
 
 - **De-anchored** — what it describes still exists. **The finding stands.** Work it normally.
 - **Voided** — genuinely gone, or already fixed. **Reply saying why, then resolve.** Never on the
@@ -46,9 +40,6 @@ it. That makes it more your responsibility, not less.
 
 **Two threads describing one defect are one unit of work.** Fix once, reply on both naming the
 other, resolve both.
-
-**Read each review's summary `body` too** (`gh api repos/:owner/:repo/pulls/<pr>/reviews`). It
-carries no thread, so it cannot be resolved; it closes by being reported in step 6.
 
 ## 2 — Fix
 
@@ -66,13 +57,12 @@ re-applying it is how a one-line change becomes a conflict.
 
 ## 3 — Reply, then resolve
 
-**Always reply. Reply before you resolve. Never resolve without replying.**
-
 ```bash
-gh api graphql -f query='mutation{addPullRequestReviewThreadReply(input:{
-  pullRequestReviewThreadId:"<id>", body:"<what you did and why>"}){comment{url}}}'
-gh api graphql -f query='mutation{resolveReviewThread(input:{threadId:"<id>"}){thread{isResolved}}}'
+node ${CLAUDE_PLUGIN_ROOT}/scripts/threads.mjs reply   --pr <pr> --thread <id> --body-file <file>
+node ${CLAUDE_PLUGIN_ROOT}/scripts/threads.mjs resolve --pr <pr> --thread <id>
 ```
+
+**Always reply. Reply before you resolve. Never resolve without replying.**
 
 **Reply immediately after each fix; resolve only once step 5 has pushed.** The reply is the record
 and can land while you work; the resolution is a claim that the fix is on the head SHA, and until
@@ -93,28 +83,24 @@ or a markdown-only change reporting "no checks ran" → **say that, never "green
 
 ## 5 — Commit, then push — last
 
-**Assert the checkout is on the PR's head branch first.** Your whole input is a number and no step
-has checked anything out:
-
-```bash
-gh pr view <pr> --json headRefName --jq .headRefName
-git rev-parse --abbrev-ref HEAD
-```
-
-Differ → **stop. Push nothing, resolve nothing, report it as the block.** Do not check it out
-yourself; your edits are uncommitted and would land on a branch nobody asked for.
-
 **Stage by path** — never `git add -A`: step 4 leaves coverage output and scratch repros behind.
 
 ```bash
 git add <path> [...] && git commit -m "fix(review): <what the threads asked for>"
 git push
+node ${CLAUDE_PLUGIN_ROOT}/scripts/threads.mjs check --pr <pr>
 ```
 
-**Check the push succeeded before resolving anything** — it sits outside the `&&` chain, and a
-push you did not notice failing becomes threads closed over nothing. **Push last, after the gate:**
-step 4's `git reset --soft HEAD~1` rewrites the top commit, and rewriting something already pushed
-needs a force push, which is denied.
+`check` is the gate on step 3's resolutions. Its exits:
+
+| exit | | |
+|---|---|---|
+| **0** | on the head branch, nothing unpushed, every thread answered | resolve what you settled |
+| **3** `mismatch` | the checkout is not the PR's head branch | **stop.** Push nothing, resolve nothing, report it. Do not check the branch out yourself — your edits are uncommitted and would land where nobody asked |
+| **4** `incomplete` | unpushed commits, or threads with no reply | fix that first; it names which |
+
+**Push last, after the gate in step 4:** its `git reset --soft HEAD~1` rewrites the top commit, and
+rewriting something already pushed needs a force push, which is denied.
 
 Pushed nothing → **say so and why.** Silence reads as success.
 
@@ -124,7 +110,7 @@ Pushed nothing → **say so and why.** Silence reads as success.
 PR review followup complete: #<pr>
 
 **Threads:** {n} in scope ({n} outdated) · {n} fixed · {n} voided · {n} left open
-**Replies:** {n} of {n} — this must equal the number in scope
+**Replies:** confirmed by `threads check` exit 0, or the count it refused on
 **Red test before the fix:** X of X (X `NO RED TEST`)
 **Gate:** {result, or "no checks ran"}
 **Pushed:** {SHA on the PR head, or "nothing pushed" and why}
