@@ -1,0 +1,14 @@
+{
+  "name": "baton",
+  "owner": {
+    "name": "jayostis"
+  },
+  "plugins": [
+    {
+      "name": "baton",
+      "source": ".",
+      "description": "An issue spec to a reviewed PR by deliberate handoff — each stage blind to the last. Never merges."
+    }
+  ],
+  "description": "Delivery workflow for GitHub-backed projects: issue spec, failing tests, implementation, review, handed back unmerged."
+}

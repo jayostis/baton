@@ -1,0 +1,37 @@
+{
+  "name": "baton",
+  "displayName": "Baton",
+  "description": "An issue spec to a reviewed PR by deliberate handoff — each stage blind to the last, so no agent can quietly redefine done. Never merges.",
+  "version": "1.0.0",
+  "author": { "name": "jayostis" },
+  "repository": "https://github.com/jayostis/baton",
+  "license": "MIT",
+  "keywords": ["workflow", "github", "issues", "pull-requests", "code-review", "tdd"],
+  "userConfig": {
+    "maintainer_handle": {
+      "type": "string",
+      "title": "Maintainer GitHub handle",
+      "description": "Fallback @mention when a delivery blocks. Only used if the issue names no assignee, no author and no 'Escalate to:' line — normally never. Without the @.",
+      "required": false
+    },
+    "escalation_label": {
+      "type": "string",
+      "title": "Escalation label",
+      "description": "Label applied to an issue when a delivery blocks and needs a human. Must already exist in the repo.",
+      "default": "needs-human",
+      "required": false
+    },
+    "verify_command": {
+      "type": "string",
+      "title": "Pre-commit gate command",
+      "description": "Run with the work staged before pushing review fixes, e.g. 'npm run precommit'. Leave blank if the project has no gate — agents then report the targeted test run alone.",
+      "required": false
+    },
+    "review_command": {
+      "type": "string",
+      "title": "PR review wrapper command",
+      "description": "Project wrapper for the PR reviewer, e.g. 'npm run pr:review'. Leave blank to use the bundled /code-review.",
+      "required": false
+    }
+  }
+}

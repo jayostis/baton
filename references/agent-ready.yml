@@ -1,0 +1,173 @@
+name: Agent-ready issue
+description: An issue a background agent can implement end-to-end, unattended, from this body alone.
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **The body is the whole spec.** A dispatched agent reads it top-down, implements it
+        faithfully — including its mistakes — and nobody sees the result until the PR.
+
+        Leave a field blank rather than guessing. A blank field is a known gap; a wrong one
+        gets implemented.
+
+        **Delivery** is the exception to "fill it in now" — it is a grooming field, filled
+        when someone knows which branch this lands on. `/baton:deliver` refuses to start without
+        it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >-
+        What is wrong, as an observation. Symptom, what actually happens, what should happen
+        instead — with evidence a reader can check: a failing command and its output, a symbol,
+        a measurement. Not a proposed fix.
+      placeholder: |
+        `npm run x` prints PASSED while zero tests were selected.
+        Observed: exit 0, 0 assertions, no test file named in the output.
+        Expected: a run that proves nothing does not report a pass.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope — in, out, do not touch
+      description: >-
+        The single highest-value field. Nobody can tell an unattended agent to stop, so the
+        boundary has to be here. Name what is out of scope explicitly, and any file or
+        subsystem it must not touch even if it looks related.
+      placeholder: |
+        In: the verdict string and its one caller.
+        Out: the selection logic itself — that is #NNN.
+        Do not touch: `src/config/paths.ts`, in flight on another branch.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: verification-types
+    attributes:
+      label: Verification types
+      description: >-
+        Tick one or more. `/baton:deliver` reads this and never chooses, so none ticked blocks it before
+        it starts — the same refusal it makes over a blank Delivery block. `unit` is every
+        automated tier that is not E2E: backend pytest, frontend vitest and component tests,
+        `scripts`.
+      options:
+        - label: unit
+        - label: e2e
+        - label: manual
+        - label: "none — no observable behaviour exists"
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification shapes
+      description: >-
+        One entry per type ticked. **Describe the shape; do not write the test.** State what
+        someone could observe changing.
+
+        **Naming code that exists is fine and often clearest** — "`parseRange()` returns
+        `null` rather than raising" is the best statement of that bug. **Naming code that does
+        not exist yet decides the design**: the agent writing the tests stubs whatever it must to
+        watch an assertion fail, so a signature written here is the one that gets built. Do that
+        only when you mean to.
+
+        **Assert the effect, not the internal.** "Assert `RETRY_LIMIT === 3`" goes green the
+        moment someone types 3 and settles nothing about whether retrying works.
+
+        `unit` / `e2e` — the command and what it must print, not "tests pass".
+
+        `manual` — anything only a person can settle, and **not only tests against the app**: a
+        device check, a passage to read, a decision to look hard at in review. Name the target and
+        say what right looks like. "Check the profile page renders" is not an item;
+        "`/settings/profile` — the avatar loads, no layout shift on the first row" is.
+
+        `none` — why no observable behaviour exists. Inventing an outer loop is worse than
+        admitting there is none.
+
+        **Every item becomes a checkbox on the PR, and they are all the maintainer's to tick.** A green
+        run proves the tests pass; only they can say the right tests are there.
+      placeholder: |
+        unit — a test drives a range with a missing upper bound and asserts `parseRange()` returns
+        `null`. `npm test -- parser`, red at HEAD.
+
+        manual — Safari/iOS, a row with no avatar: open `/settings/profile`; the fallback initial
+        should render without the row reflowing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Optional. Instruction-following does degrade with count, so a long list is worth
+        reading as a signal: if the criteria describe several separable changes, it is
+        several issues. But a holistic fix has to be able to state its whole shape, and a
+        cap is what fragments one into pieces that each describe a symptom.
+    validations:
+      required: false
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files and symbols likely touched
+      description: >-
+        By name — `src/parser.ts` → `parseRange()`. **Never line numbers**: they go stale
+        between writing and dispatch. It is also the collision boundary when several issues are
+        dispatched at once, so an omission here can put two agents in one file.
+    validations:
+      required: false
+
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Suspected cause (optional — tag your confidence)
+      description: >-
+        If you have a theory, give it *and* say how sure you are, then tell the agent to check
+        it first. Agents adopt a stated cause readily, so a confident wrong guess produces a
+        confidently wrong PR that passes its own review. A hedged right guess costs nothing.
+      placeholder: |
+        Suspected: `normalise()` collapses an empty range into a null one. Medium confidence —
+        verify before implementing. If it is wrong, fix the real cause and say so in the PR.
+    validations:
+      required: false
+
+  - type: textarea
+    id: delivery
+    attributes:
+      label: Delivery
+      description: >-
+        Where this lands, as two literal branch names. `/baton:deliver` reads only this — it never
+        infers a base from a milestone or a label, and never falls back to `main`.
+
+        `Integration branch:` is both the branch to work off and the PR target, and it must
+        already exist on origin. `Work branch:` is where the commits go; it **must contain
+        this issue's number**, which is what catches a Delivery block pasted over from
+        another issue — otherwise the work lands on that issue's branch, and pushes to a PR
+        that isn't yours.
+
+        Declared, never derived. An agent that invents the name derives a different one after
+        any title reword, misses the branch the last attempt pushed, and forks a second off
+        the base.
+
+        Blank is fine at filing time; filling it is part of grooming. Blank at delivery time
+        blocks.
+      value: |
+        Integration branch:
+        Work branch:
+    validations:
+      required: false
+
+  - type: textarea
+    id: open-questions
+    attributes:
+      label: Open questions
+      description: >-
+        Anything undecided, one per line, each as `[NEEDS CLARIFICATION: the question]`.
+        **An issue carrying an unresolved marker is not dispatchable** — that is a grep, not a
+        judgement call. Resolve them into the body, or leave the issue undispatched on purpose.
+    validations:
+      required: false
