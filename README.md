@@ -71,6 +71,18 @@ A chain that yields nobody still blocks, and says in the comment that no owner w
   needs its own at `.github/ISSUE_TEMPLATE/agent-ready.yml`. Don't let the two drift.
 - **One label.** `needs-rework` — the maintainer's explicit stop. `/baton:deliver` blocks on it.
   No positive label is required: an issue is deliverable unless something says otherwise.
+- **A reviewer that can reach the PR.** `/baton:pr review` checks `gh auth status` and that the
+  PR is reachable before it spawns anything, and blocks rather than reviewing if either fails.
+  Driven headless it declares its tool surface — `--permission-mode dontAsk` with an explicit
+  `--allowedTools` — and blocks on a non-empty `permission_denials` array in the JSON output.
+  `claude -p` exits `0` with `"is_error": false` when every tool call was denied; that array is
+  the only record, so the allowlist does not have to be right in advance.
+- **Review tuning in `CLAUDE.md`, not `REVIEW.md`.** The managed Code Review service reads
+  `REVIEW.md`; the local `/code-review` this calls does not — it follows `CLAUDE.md` like any
+  session. A **re-review convergence** rule is the one most worth having, since it targets the same
+  problem as the pass cap: something like *"after the first review, suppress new nits and report
+  Important findings only."* Documented for the managed service; **not verified here** for the
+  local command.
 - **A Delivery block** on each issue naming the integration branch and the work branch. `deliver`
   never infers either — a derived name changes when the title is reworded, and the re-run then forks
   a second branch off the base.

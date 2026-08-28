@@ -21,6 +21,11 @@ pass has been observed declining whole file classes — test and fixture hunks �
 own scope note. Whether that is deterministic is not established, which is why § 3 reconciles the
 scope the reviewer reports against the files that changed rather than predicting it.
 
+**A project can move this bar without touching this file.** The local reviewer follows the repo's
+`CLAUDE.md`, so a convergence rule there — suppress nits after the first review, report Important
+findings only — narrows later passes at the source rather than by choosing a lower level. It does
+not read `REVIEW.md`, which is the managed service's file.
+
 **Which case you are in comes from the findings, never the threads.** [`followup`](followup.md)
 resolves what it fixes, so thread state is emptiest exactly when a later pass is cheapest.
 
