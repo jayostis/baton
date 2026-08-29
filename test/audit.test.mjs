@@ -13,7 +13,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fakeRun } from '../scripts/lib/exec.mjs'
@@ -188,4 +188,139 @@ test('nothing emitted carries the absolute path, the username, the observed repo
   assert.doesNotMatch(text, /private-oncology/, 'the repository the fact was observed in')
   assert.doesNotMatch(text, /PATIENT_ROSTER_TOKEN/, 'the excerpt')
   assert.doesNotMatch(text, /x{200}/, 'the excerpt, truncated, is still the excerpt')
+})
+
+// ---------------------------------------------------------------- review followup
+//
+// One test per finding raised on PR #20. Each fails against the code as
+// reviewed and passes after the fix, so the fix is the thing under test rather
+// than the description of it.
+
+// Returns the printed text and the exit code, for the paths that never reach
+// the JSON report — a parseArgs error is reported on the human line.
+function auditRaw(argv) {
+  const run = fakeRun(ghScript())
+  let code
+  const printed = capture(() => { code = main(argv, { run }) })
+  return { printed, code }
+}
+
+test('a --no-post run is not filed as findings-unposted: nothing was posted by design', () => {
+  const record = {
+    schema: 1, tool: 'pr-review', ts: '2026-08-28T20:03:11.001Z', repo: 'jayostis/sdk-typescript',
+    outcome: 'inspected', exit: 5, reason: 'no-post run: 3 finding(s) reported, none posted by design',
+    pr: '9', levelAsked: 'medium', levelSeen: 'medium', threadsAdded: 0, claimed: 3, noPost: true,
+  }
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl([record]) })
+  const { out } = audit(dir)
+
+  assert.ok(!out.candidates.some(c => c.kind === 'findings-unposted'),
+    'the record says noPost and inspected; filing it is filing the guard working as a defect')
+  assert.equal(out.candidates.length, 0, 'a no-post run that reported findings is not a finding')
+})
+
+test('a genuine unposted findings claim is still reported', () => {
+  const genuine = RECORDS.filter(r => r.claimed === 4)
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl(genuine) })
+  const { out } = audit(dir)
+
+  assert.deepEqual(out.candidates.map(c => c.kind), ['findings-unposted'],
+    'an unproven run that claimed findings and posted none is still the finding it was')
+})
+
+test('a Windows path containing a space is redacted whole, and the prose after it survives', () => {
+  const record = {
+    schema: 1, tool: 'pr-review', ts: '2026-08-28T20:03:11.001Z', repo: 'jayostis/sdk-typescript',
+    outcome: 'denied', exit: 3, denials: 1, deniedTools: ['Bash'],
+    reason: 'C:\\Users\\Jay\\OneDrive - Acme Corp\\clients\\bigpharma-secret is not a checkout of a GitHub repository',
+  }
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl([record]) })
+  const { out } = audit(dir)
+  const text = JSON.stringify(out)
+
+  assert.doesNotMatch(text, /bigpharma-secret/, 'the private leaf, past the space')
+  assert.doesNotMatch(text, /Acme/, 'the organisation name, past the space')
+  assert.doesNotMatch(text, /OneDrive/, 'the segment the space sits in')
+  assert.match(text, /is not a checkout of a GitHub repository/,
+    'redaction must stop at the path: swallowing the sentence destroys the evidence and collapses distinct reasons')
+})
+
+test('--since accepts what Date.parse accepts and compares it chronologically, not lexically', () => {
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl(RECORDS) })
+
+  const before = audit(dir, { argv: ['--since', 'Aug 1 2026'] }).out
+  assert.equal(before.scanned, RECORDS.length,
+    'every record is newer than Aug 1 2026; a lexical compare drops them all and reports a clean sweep of nothing')
+
+  const after = audit(dir, { argv: ['--since', 'Dec 1 2026'] }).out
+  assert.equal(after.scanned, 0, 'and a window that genuinely excludes them still excludes them')
+})
+
+test('evidence reports the recorded number of denials, not the number of distinct tool names', () => {
+  const record = {
+    schema: 1, tool: 'pr-review', ts: '2026-08-28T20:03:11.001Z', repo: 'jayostis/sdk-typescript',
+    outcome: 'denied', exit: 3, reason: 'denied', denials: 7, deniedTools: ['PowerShell'],
+  }
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl([record]) })
+  const { out } = audit(dir)
+
+  assert.equal(out.candidates.length, 1)
+  assert.equal(out.candidates[0].evidence[0].denials, 7,
+    'the log records 7 denials across 1 de-duplicated tool name; evidence must not contradict the log it quotes')
+  assert.deepEqual(out.candidates[0].evidence[0].deniedTools, ['PowerShell'], 'the tool list is a separate fact')
+})
+
+test('a run denied with no denials count is still classified as denied', () => {
+  const record = {
+    schema: 1, tool: 'pr-review', ts: '2026-08-28T20:03:11.001Z', repo: 'jayostis/sdk-typescript',
+    outcome: 'denied', exit: 3, reason: 'denied', deniedTools: ['Bash', 'PowerShell'],
+  }
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl([record]) })
+  const { out } = audit(dir)
+
+  assert.deepEqual(out.candidates.map(c => c.kind), ['denied'],
+    'the guard must keep firing on the tool list alone, whatever evidence reports as the count')
+})
+
+test('a tool named for an Object.prototype key is an unknown tool, not a crash', () => {
+  const record = {
+    schema: 1, tool: 'constructor', ts: '2026-08-28T20:03:11.001Z', repo: 'jayostis/sdk-typescript',
+    outcome: 'ok', exit: 0, reason: 'from a writer this reader does not know',
+  }
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl([...RECORDS, record]) })
+  const { out } = audit(dir)
+
+  assert.ok(out.candidates.some(c => c.kind === 'unknown-tool'),
+    'EXITS.constructor is inherited and truthy, so the unknown tool is not flagged and the exit check then throws')
+  assert.equal(out.scanned, RECORDS.length + 1, 'and one odd string in `tool` must not take the whole sweep down')
+})
+
+test('the run log directory is read without being created, so a machine with no log says so', () => {
+  const home = mkdtempSync(join(tmpdir(), 'baton-audit-fresh-'))
+  const saved = process.env.BATON_HOME
+  process.env.BATON_HOME = home
+  try {
+    const { printed, code } = auditRaw(['--repo', THIS_REPO, '--no-log'])
+    assert.equal(code, 2, 'no log is a preflight, not a clean sweep of zero records')
+    assert.match(printed, /does not exist/, 'the operator must not read "nothing to report" as "the log is clean"')
+    assert.equal(existsSync(join(home, 'runs')), false, 'a read-only verb must not create the directory it is checking for')
+  } finally {
+    if (saved === undefined) delete process.env.BATON_HOME
+    else process.env.BATON_HOME = saved
+  }
+})
+
+test('a value-taking flag with no value is a preflight, not a silent default', () => {
+  const trailing = auditRaw(['--repo', THIS_REPO, '--json', '--runs'])
+  assert.equal(trailing.code, 2, '--runs with no value must not fall through to the real run log')
+  assert.match(trailing.printed, /--runs/, 'and the diagnostic has to name the flag')
+
+  const swallowed = auditRaw(['--repo', THIS_REPO, '--runs', '--json'])
+  assert.equal(swallowed.code, 2, '--runs must not silently swallow the next flag as its value')
+
+  for (const flag of ['--since', '--dir', '--repo']) {
+    const r = auditRaw([flag])
+    assert.equal(r.code, 2, flag + ' with no value must be a preflight')
+    assert.match(r.printed, new RegExp(flag), flag + ' must be named in the diagnostic')
+  }
 })

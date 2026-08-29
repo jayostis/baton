@@ -28,7 +28,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { run as realRun, isMain } from './lib/exec.mjs'
-import { batonHome, runsDir, appendRun as writeRun } from './lib/runlog.mjs'
+import { batonHome, appendRun as writeRun } from './lib/runlog.mjs'
 
 const EXIT = { OK: 0, CANDIDATES: 1, PREFLIGHT: 2 }
 
@@ -56,7 +56,16 @@ const EXITS = {
 // adds to the log cannot leak by default. Basename-only was considered and
 // rejected -- the leaf of `C:\Users\Jay\dev\onc-secret` is the private part.
 
-const WIN_PATH = /[A-Za-z]:[\\/][^\s"',;)]*/g
+// Spaces are the norm in a Windows path (`Program Files`, `OneDrive - Org`),
+// and a class that stops at the first one redacts the drive and leaks the leaf.
+// So a segment may contain spaces -- but only a segment that is followed by a
+// separator, because the alternative is that the match runs on through the
+// prose after the path (`... is not a checkout of a GitHub repository`), which
+// destroys the evidence and collapses distinct reasons into one key.
+// Residual, deliberately: a FINAL segment containing a space still ends at that
+// space, since nothing in the text distinguishes `\My App` from `\baton is`.
+const WIN_SEG = String.raw`[^\\/\s"',;)]+(?: +[^\\/\s"',;)]+)*`
+const WIN_PATH = new RegExp(String.raw`[A-Za-z]:[\\/](?:${WIN_SEG}[\\/])*[^\\/\s"',;)]*`, 'g')
 const POSIX_PATH = /(^|[\s"'(=])(\/(?:[\w.-]+\/)+[\w.-]+)/g
 const SLUG = /\b[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9._-]+/g
 
@@ -101,13 +110,19 @@ function readRecords(dir, since) {
 // record has to group with its two identical siblings, and never contains a
 // timestamp, because a fingerprint has to survive to the next run to dedupe.
 
-const denialsOf = r => (Array.isArray(r.deniedTools) ? r.deniedTools.length : Number(r.denials) || 0)
+// Two different facts, and the writer records them separately: `denials` is the
+// number of calls refused, `deniedTools` is that list de-duplicated by name. So
+// `denials: 7, deniedTools: ["PowerShell"]` is one tool and seven refusals --
+// reporting 1 as the count contradicts the log this is quoting. The guard only
+// needs to know that something was refused; evidence needs the recorded number.
+const denialCountOf = r => Number(r.denials) || 0
+const wasDenied = r => denialCountOf(r) > 0 || (Array.isArray(r.deniedTools) && r.deniedTools.length > 0)
 
 function classify(r, self) {
   const reason = redact(r.reason, self)
   const tools = Array.isArray(r.deniedTools) ? r.deniedTools.map(t => redact(String(t), self)).sort() : []
 
-  if (denialsOf(r) > 0) {
+  if (wasDenied(r)) {
     return {
       kind: 'denied', key: ['denied', ...tools].join('|'),
       title: `a run was denied ${tools.length ? tools.join(', ') : 'a tool call'} and could not deliver`,
@@ -124,7 +139,13 @@ function classify(r, self) {
     }
   }
 
-  if (Number(r.claimed) > 0 && Number(r.threadsAdded ?? 0) === 0) {
+  // A run that could not post has nothing to say about what the PR holds:
+  // `--no-post` and `--dry-run` both report `inspected`, and the first carries
+  // `noPost: true`. Reading either as findings that went missing files the
+  // guard working as a defect -- the same mistake the level-drift rule above
+  // takes care to avoid.
+  const couldPost = r.noPost !== true && r.outcome !== 'inspected'
+  if (couldPost && Number(r.claimed) > 0 && Number(r.threadsAdded ?? 0) === 0) {
     return {
       kind: 'findings-unposted', key: 'findings-unposted',
       title: 'the reviewer claimed findings and the PR holds no threads',
@@ -145,14 +166,14 @@ function classify(r, self) {
     }
   }
 
-  if (r.tool != null && !EXITS[r.tool]) {
+  if (r.tool != null && !Object.hasOwn(EXITS, r.tool)) {
     return {
       kind: 'unknown-tool', key: `unknown-tool|${r.tool}`,
       title: `the log carries a tool this reader does not know: ${r.tool}`,
     }
   }
 
-  const documented = r.tool ? EXITS[r.tool] : null
+  const documented = r.tool != null && Object.hasOwn(EXITS, r.tool) ? EXITS[r.tool] : null
   if (documented && Number.isInteger(r.exit) && !documented.includes(r.exit)) {
     return {
       kind: 'undocumented-exit', key: `undocumented-exit|${r.tool}|${r.exit}`,
@@ -177,7 +198,7 @@ function evidenceOf(r, self) {
     where: r.repo == null ? 'unattributed' : r.repo === self ? 'this repository' : 'another project',
     levelAsked: r.levelAsked ?? null,
     levelSeen: r.levelSeen ?? null,
-    denials: denialsOf(r) || null,
+    denials: denialCountOf(r) || null,
     deniedTools: Array.isArray(r.deniedTools) ? r.deniedTools.map(t => redact(String(t), self)) : null,
     threadsAdded: r.threadsAdded ?? null,
     claimed: r.claimed ?? null,
@@ -264,18 +285,35 @@ function issueBodies(run, repo, cwd) {
 
 function parseArgs(argv) {
   const out = { runs: null, repo: null, since: null, dir: process.cwd(), json: false, noLog: false }
+  // An unknown argument is refused, so a known one that silently loses its
+  // value must be too: `--runs` at the end of the line set `runs` to undefined
+  // and fell through to the operator's real log, auditing everything with no
+  // diagnostic. A following flag is the same mistake, not a directory name.
+  let bad = null
+  const value = (flag, i) => {
+    const v = argv[i + 1]
+    if (v === undefined || v.startsWith('--')) { bad ??= `${flag} requires a value`; return null }
+    return v
+  }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--runs') out.runs = argv[++i]
-    else if (a === '--repo') out.repo = argv[++i]
-    else if (a === '--since') out.since = argv[++i]
-    else if (a === '--dir') out.dir = argv[++i]
+    if (a === '--runs') out.runs = value(a, i++)
+    else if (a === '--repo') out.repo = value(a, i++)
+    else if (a === '--since') out.since = value(a, i++)
+    else if (a === '--dir') out.dir = value(a, i++) ?? out.dir
     else if (a === '--json') out.json = true
     else if (a === '--no-log') out.noLog = true
     else return { error: `unrecognised argument: ${a}` }
   }
-  if (out.since && Number.isNaN(Date.parse(out.since))) {
-    return { error: `--since must be an ISO timestamp, got ${out.since}` }
+  if (bad) return { error: bad }
+  if (out.since) {
+    // Validated by Date.parse but compared as a string against an ISO `ts`, so
+    // anything Date.parse accepts and ISO does not sorted wrong: "Aug 1 2026"
+    // passed the check and then excluded every record, reporting a clean sweep
+    // of nothing. Normalising here makes the check and the comparison agree.
+    const t = Date.parse(out.since)
+    if (Number.isNaN(t)) return { error: `--since must be an ISO timestamp, got ${out.since}` }
+    out.since = new Date(t).toISOString()
   }
   return out
 }
@@ -297,7 +335,11 @@ export function main(argv = process.argv.slice(2), deps = {}) {
     self = r.out.trim()
   }
 
-  const dir = o.runs ?? runsDir()
+  // Not runsDir(): it mkdirs, so the guard below could never fire on the
+  // default path. A machine that has never run baton then read as a clean
+  // sweep of zero records rather than as having no log at all -- and a
+  // read-only verb created a directory as a side effect of looking.
+  const dir = o.runs ?? join(batonHome(), 'runs')
   if (!existsSync(dir) || !statSync(dir).isDirectory()) {
     return done(o, { self, outcome: 'preflight', reason: 'the run log directory does not exist' }, EXIT.PREFLIGHT)
   }
