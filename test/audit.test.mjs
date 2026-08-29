@@ -449,3 +449,26 @@ test('a POSIX path containing a space is redacted whole, leaf and organisation a
   assert.equal(out.candidates[0].evidence[0].reason, 'at <path> here',
     'redaction stops at the end of the path, and the prose after it survives')
 })
+
+test('a repository slug in the prose after a path does not drag the match through the sentence', () => {
+  // The tail here ends in `jayostis/baton`, and that slash is a path separator
+  // as far as the pattern is concerned: a spaced segment allowed to run on
+  // reaches it and swallows the sentence between. This is the reason the real
+  // log carries three times over, so the evidence it destroys is the evidence
+  // the auditor exists to draft from.
+  const dir = runsDir({
+    'jayostis__sdk-typescript.jsonl': jsonl([
+      preflight('2026-08-28T21:28:54.783Z'),
+      preflight('2026-08-28T22:01:10.102Z', 'pr-review'),
+    ]),
+  })
+  const { out } = audit(dir)
+  const text = JSON.stringify(out)
+  const candidate = out.candidates.find(c => c.kind === 'preflight-repeat')
+
+  assert.doesNotMatch(text, /Users[\/]+Jay/, 'the absolute path')
+  assert.doesNotMatch(text, /\bJay\b/, 'the username')
+  assert.equal(candidate?.evidence[0].reason,
+    '--repo says <repo> but <path> is a checkout of jayostis/baton',
+    'which directory and which repository disagreed is the whole content of this finding')
+})
