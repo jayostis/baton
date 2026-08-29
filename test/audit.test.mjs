@@ -342,3 +342,110 @@ test('an argument error still honours --no-log, on either side of the bad argume
     }
   }
 })
+
+// ---------------------------------------------------------------- PR #20 followup
+//
+// One test per unresolved thread on PR #20. Each fails against the code as
+// reviewed and passes after the fix.
+
+test('a value-taking flag with no value does not swallow the flag after it — --no-log and --json included', () => {
+  // `value(a, i++)` advanced `i` whether or not the value was accepted, so the
+  // flag that refused to be a value was then skipped by the loop's own `i++`.
+  // The flag governing the log is exactly the flag that got dropped.
+  const saved = process.env.BATON_HOME
+  const home = mkdtempSync(join(tmpdir(), 'baton-audit-swallow-'))
+  process.env.BATON_HOME = home
+  try {
+    const { printed, code } = auditRaw(['--repo', THIS_REPO, '--runs', '--no-log'])
+    assert.equal(code, 2, '--runs with no value is a preflight')
+    assert.equal(existsSync(join(home, 'runs')), false,
+      '--no-log came after the valueless --runs and must still be parsed: a refused run must not append the record it was told not to write')
+    assert.match(printed, /--runs/, 'the diagnostic has to name the flag it refused')
+  } finally {
+    if (saved === undefined) delete process.env.BATON_HOME
+    else process.env.BATON_HOME = saved
+  }
+
+  const { printed, code } = auditRaw(['--repo', THIS_REPO, '--runs', '--json', '--no-log'])
+  assert.equal(code, 2, '--runs with no value is a preflight')
+  assert.doesNotThrow(() => JSON.parse(printed),
+    '--json was passed and must survive the valueless --runs: a caller that asked for JSON and got the human line has unparseable output alongside exit 2')
+  assert.equal(JSON.parse(printed).exit, 2, 'and the JSON report carries the preflight exit')
+})
+
+test('threadsAdded: null means the threads could not be read, not that the PR holds none', () => {
+  // pr-review.mjs records `threadsAdded: added === null ? null : added.length`,
+  // and `could not re-read threads after the run` is one of its own exits.
+  // `null ?? 0` is 0, so that record read as "the PR holds no threads".
+  const unreadable = {
+    schema: 1, tool: 'pr-review', ts: '2026-08-28T20:03:11.001Z', repo: 'jayostis/sdk-typescript',
+    outcome: 'unproven', exit: 4, reason: 'could not re-read threads after the run',
+    pr: '9', levelAsked: 'medium', levelSeen: 'medium', claimed: 4, threadsAdded: null, noPost: false,
+  }
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl([unreadable]) })
+  const { out } = audit(dir)
+
+  assert.ok(!out.candidates.some(c => c.kind === 'findings-unposted'),
+    'nobody looked at the threads; asserting the PR holds none is asserting a fact the log does not contain')
+  assert.equal(out.candidates.length, 0, 'an unknown thread count classifies as nothing')
+})
+
+test('two Windows paths in one reason are redacted separately, and the prose between them survives', () => {
+  // A segment may hold spaces, but a second drive letter must not be absorbed
+  // into one: the run-on collapses distinct reasons into a single key and
+  // fabricates a recurrence with no evidence left to disprove it.
+  const denied = (reason, ts) => ({
+    schema: 1, tool: 'pr-review', ts, repo: 'jayostis/sdk-typescript',
+    outcome: 'denied', exit: 3, denials: 1, deniedTools: ['Bash'], reason,
+  })
+  const dir = runsDir({
+    'jayostis__sdk-typescript.jsonl': jsonl([
+      denied('C:\\Users\\Jay\\alpha is not a checkout of C:\\dev\\one', '2026-08-28T20:03:11.001Z'),
+      denied('D:\\work\\beta is a stale worktree of D:\\srv\\two', '2026-08-28T20:04:11.001Z'),
+    ]),
+  })
+  const { out } = audit(dir)
+  const reasons = out.candidates.flatMap(c => c.evidence.map(e => e.reason))
+
+  assert.deepEqual(reasons.sort(), [
+    '<path> is a stale worktree of <path>',
+    '<path> is not a checkout of <path>',
+  ], 'each path is redacted on its own and the words between them are the evidence')
+
+  // The same run-on, on the path where it does real damage.
+  const preflightTwoPaths = (reason, ts) => ({
+    schema: 1, tool: 'pr-review', ts, repo: 'jayostis/sdk-typescript',
+    outcome: 'preflight', exit: 2, reason, pr: '9',
+  })
+  const dir2 = runsDir({
+    'jayostis__sdk-typescript.jsonl': jsonl([
+      preflightTwoPaths('C:\\Users\\Jay\\alpha is not a checkout of C:\\dev\\one', '2026-08-28T20:03:11.001Z'),
+      preflightTwoPaths('D:\\work\\beta is a stale worktree of D:\\srv\\two', '2026-08-28T20:04:11.001Z'),
+    ]),
+  })
+  const { out: out2 } = audit(dir2)
+
+  assert.equal(out2.candidates.length, 0,
+    'two unrelated preflight refusals are two single refusals, not one recurrence: minCount 2 exists to stop exactly this')
+})
+
+test('a POSIX path containing a space is redacted whole, leaf and organisation alike', () => {
+  // `[\w.-]+` stopped at the first space, leaving the private word in the text
+  // and handing the remainder to SLUG, which rewrote it as <repo> — so a leaked
+  // path fragment read as a redacted repository slug.
+  const record = {
+    schema: 1, tool: 'pr-review', ts: '2026-08-28T20:03:11.001Z', repo: 'jayostis/sdk-typescript',
+    outcome: 'denied', exit: 3, denials: 1, deniedTools: ['Bash'],
+    reason: 'at /home/jay/My Secret Co/proj/x here',
+  }
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl([record]) })
+  const { out } = audit(dir)
+  const text = JSON.stringify(out)
+
+  assert.doesNotMatch(text, /Secret/, 'the private word past the first space')
+  assert.doesNotMatch(text, /\bCo\b/, 'the organisation segment')
+  assert.doesNotMatch(text, /\bproj\b/, 'the segment SLUG then disguised as <repo>')
+  assert.doesNotMatch(text, /\bjay\b/, 'the username')
+  assert.equal(out.candidates[0].evidence[0].reason, 'at <path> here',
+    'redaction stops at the end of the path, and the prose after it survives')
+})

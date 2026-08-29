@@ -64,9 +64,23 @@ const EXITS = {
 // destroys the evidence and collapses distinct reasons into one key.
 // Residual, deliberately: a FINAL segment containing a space still ends at that
 // space, since nothing in the text distinguishes `\My App` from `\baton is`.
-const WIN_SEG = String.raw`[^\\/\s"',;)]+(?: +[^\\/\s"',;)]+)*`
+//
+// `:` is excluded from a SPACED continuation, and only from there. A segment
+// may still hold spaces, but a second drive letter can no longer be absorbed
+// into one: `C:\a\alpha is not a checkout of C:\dev\one` matched end to end as
+// a single path, so two unrelated refusals collapsed onto one key and reported
+// as a recurrence -- the fabrication `minCount: 2` exists to prevent -- with
+// the prose that distinguished them redacted away as evidence.
+const WIN_SEG = String.raw`[^\\/\s"',;)]+(?: +[^\\/\s"',;:)]+)*`
 const WIN_PATH = new RegExp(String.raw`[A-Za-z]:[\\/](?:${WIN_SEG}[\\/])*[^\\/\s"',;)]*`, 'g')
-const POSIX_PATH = /(^|[\s"'(=])(\/(?:[\w.-]+\/)+[\w.-]+)/g
+// The same rule, for the same reason, on POSIX: `[\w.-]+` stopped at the first
+// space, so `/home/jay/My Secret Co/proj/x` left `Secret` in the text and handed
+// `Co/proj` to SLUG, which rewrote it as `<repo>` -- a leaked path fragment
+// disguised as a redacted repository name. Not a Windows-only leak, and this
+// repository is public. A continuation excludes `/` as well as `:`, which is
+// what stops the match running on into the prose after the path.
+const POSIX_SEG = String.raw`[\w.-]+(?: +[^\\/\s"',;:)]+)*`
+const POSIX_PATH = new RegExp(String.raw`(^|[\s"'(=])(\/(?:${POSIX_SEG}\/)+[\w.-]+)`, 'g')
 const SLUG = /\b[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9._-]+/g
 
 function redact(text, self) {
@@ -144,8 +158,14 @@ function classify(r, self) {
   // `noPost: true`. Reading either as findings that went missing files the
   // guard working as a defect -- the same mistake the level-drift rule above
   // takes care to avoid.
+  // And `threadsAdded: null` is "the threads could not be read", not "the PR
+  // holds none" -- pr-review.mjs writes exactly that for its own
+  // `could not re-read threads after the run` exit. `?? 0` read the absence of
+  // a count as a count of zero and filed a PR nobody had looked at, which is
+  // the same mistake again: asserting a fact the log does not contain. Strict,
+  // so an unknown thread count classifies as nothing.
   const couldPost = r.noPost !== true && r.outcome !== 'inspected'
-  if (couldPost && Number(r.claimed) > 0 && Number(r.threadsAdded ?? 0) === 0) {
+  if (couldPost && Number(r.claimed) > 0 && r.threadsAdded === 0) {
     return {
       kind: 'findings-unposted', key: 'findings-unposted',
       title: 'the reviewer claimed findings and the PR holds no threads',
@@ -297,10 +317,16 @@ function parseArgs(argv) {
   }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--runs') out.runs = value(a, i++)
-    else if (a === '--repo') out.repo = value(a, i++)
-    else if (a === '--since') out.since = value(a, i++)
-    else if (a === '--dir') out.dir = value(a, i++) ?? out.dir
+    // `i` advances only when a value was actually taken. Advancing on failure
+    // consumed the token that had just refused to be a value -- always another
+    // flag -- and the loop's own `i++` then skipped it, so `--runs --no-log`
+    // parsed neither: the refused run appended the record `--no-log` had asked
+    // it not to write. `--runs --json` lost `--json` the same way and reported
+    // on the human line, handing a caller unparseable output alongside exit 2.
+    if (a === '--runs') { const v = value(a, i); if (v !== null) { out.runs = v; i++ } }
+    else if (a === '--repo') { const v = value(a, i); if (v !== null) { out.repo = v; i++ } }
+    else if (a === '--since') { const v = value(a, i); if (v !== null) { out.since = v; i++ } }
+    else if (a === '--dir') { const v = value(a, i); if (v !== null) { out.dir = v; i++ } }
     else if (a === '--json') out.json = true
     else if (a === '--no-log') out.noLog = true
     else bad ??= `unrecognised argument: ${a}`
