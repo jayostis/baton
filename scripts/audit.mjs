@@ -303,16 +303,21 @@ function parseArgs(argv) {
     else if (a === '--dir') out.dir = value(a, i++) ?? out.dir
     else if (a === '--json') out.json = true
     else if (a === '--no-log') out.noLog = true
-    else return { error: `unrecognised argument: ${a}` }
+    else bad ??= `unrecognised argument: ${a}`
   }
-  if (bad) return { error: bad }
+  // An error carries the options parsed alongside it. A bare `{ error }` left
+  // `noLog` undefined, so a refused run appended the very record the operator
+  // had just asked it not to write -- and the next sweep read that back as a
+  // finding of its own. Parsing continues past a bad argument for the same
+  // reason: the flag governing the log may sit on either side of it.
+  if (bad) return { ...out, error: bad }
   if (out.since) {
     // Validated by Date.parse but compared as a string against an ISO `ts`, so
     // anything Date.parse accepts and ISO does not sorted wrong: "Aug 1 2026"
     // passed the check and then excluded every record, reporting a clean sweep
     // of nothing. Normalising here makes the check and the comparison agree.
     const t = Date.parse(out.since)
-    if (Number.isNaN(t)) return { error: `--since must be an ISO timestamp, got ${out.since}` }
+    if (Number.isNaN(t)) return { ...out, error: `--since must be an ISO timestamp, got ${out.since}` }
     out.since = new Date(t).toISOString()
   }
   return out

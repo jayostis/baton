@@ -324,3 +324,21 @@ test('a value-taking flag with no value is a preflight, not a silent default', (
     assert.match(r.printed, new RegExp(flag), flag + ' must be named in the diagnostic')
   }
 })
+
+test('an argument error still honours --no-log, on either side of the bad argument', () => {
+  const saved = process.env.BATON_HOME
+  for (const argv of [['--no-log', '--nope'], ['--nope', '--no-log']]) {
+    const home = mkdtempSync(join(tmpdir(), 'baton-audit-badarg-'))
+    process.env.BATON_HOME = home
+    try {
+      const { printed, code } = auditRaw(argv)
+      assert.equal(code, 2, `an unrecognised argument is a preflight: ${argv.join(' ')}`)
+      assert.match(printed, /--nope/, 'and the diagnostic has to name the argument it refused')
+      assert.equal(existsSync(join(home, 'runs')), false,
+        `--no-log was passed, so \`${argv.join(' ')}\` must not append the preflight record the auditor then reads back as its own noise`)
+    } finally {
+      if (saved === undefined) delete process.env.BATON_HOME
+      else process.env.BATON_HOME = saved
+    }
+  }
+})
