@@ -21,6 +21,7 @@ issue with a label and an @mention.
 | `/baton:pr` | `status` · `comments` · `review` · `followup` · `loop` · `ci` | reads, posts, pushes |
 | `/baton:deliver` | *(none — takes an issue number)* | the whole pipeline, stopping before merge |
 | `/baton:tdd` | *(none)* | red-green-refactor; two agents depend on it |
+| `/baton:audit` | *(none — takes `--since`)* | drains the run log into drafts; reads everywhere, files nothing |
 
 No verb is a default. A bare `/baton:pr <n>` reports `status` and then says the verb was missing —
 the shorter thing to type must not be the one that acts.
