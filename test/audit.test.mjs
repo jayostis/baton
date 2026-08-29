@@ -472,3 +472,23 @@ test('a repository slug in the prose after a path does not drag the match throug
     '--repo says <repo> but <path> is a checkout of jayostis/baton',
     'which directory and which repository disagreed is the whole content of this finding')
 })
+
+test('a forward-slash Windows path keeps its spaced segment, because that is how these skills spell --dir', () => {
+  // Requiring a backslash after a spaced segment fixes the slug run-on above
+  // and breaks this: the path ends at its first space and the private segment
+  // after it survives into the draft. Every `--dir` in these skills is written
+  // with forward slashes, so this is not the exotic case.
+  const record = {
+    schema: 1, tool: 'pr-review', ts: '2026-08-28T20:03:11.001Z', repo: 'jayostis/sdk-typescript',
+    outcome: 'preflight', exit: 2,
+    reason: 'in C:/Users/Jay/My Secret Co/proj/x here',
+  }
+  const dir = runsDir({ 'jayostis__sdk-typescript.jsonl': jsonl([record, { ...record, ts: '2026-08-28T20:05:00.000Z' }]) })
+  const { out } = audit(dir)
+  const text = JSON.stringify(out)
+
+  assert.doesNotMatch(text, /Secret/, 'the private word past the first space')
+  assert.doesNotMatch(text, /\bCo\b/, 'the organisation segment')
+  assert.equal(out.candidates[0].evidence[0].reason, 'in <path> here',
+    'the whole path goes, whichever separator it is spelled with')
+})

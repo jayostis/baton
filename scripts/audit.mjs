@@ -71,8 +71,28 @@ const EXITS = {
 // a single path, so two unrelated refusals collapsed onto one key and reported
 // as a recurrence -- the fabrication `minCount: 2` exists to prevent -- with
 // the prose that distinguished them redacted away as evidence.
+//
+// A SPACED segment must be followed by the separator the drive letter used --
+// captured once and backreferenced, not assumed. That is the difference
+// between a folder name and a sentence. The reason this log carries three
+// times over ends in a repository slug:
+// `...\skills\baton is a checkout of jayostis/baton`, and the slash inside
+// that slug was read as a separator, so the match ran from the drive letter to
+// the end of the sentence and redacted away the pair of names the finding
+// consisted of.
+//
+// Pinning the separator rather than hardcoding `\` is what keeps
+// `C:/Users/Jay/My Secret Co/proj/x` whole. Requiring a backslash was tried
+// first and measured: it ended that path at its first space and left `Secret`
+// in the text -- a new leak, in a shape this repository writes constantly,
+// since every `--dir` in these skills is spelled with forward slashes.
+//
+// Residual, measured: a forward-slash path followed by prose ending in a slug
+// still swallows the sentence, exactly as the POSIX pattern below does. That
+// over-redacts and does not leak, which is the direction to fail in.
 const WIN_SEG = String.raw`[^\\/\s"',;)]+(?: +[^\\/\s"',;:)]+)*`
-const WIN_PATH = new RegExp(String.raw`[A-Za-z]:[\\/](?:${WIN_SEG}[\\/])*[^\\/\s"',;)]*`, 'g')
+const WIN_PLAIN = String.raw`[^\\/\s"',;)]+`
+const WIN_PATH = new RegExp(String.raw`[A-Za-z]:([\\/])(?:${WIN_SEG}\1|${WIN_PLAIN}[\\/])*[^\\/\s"',;)]*`, 'g')
 // The same rule, for the same reason, on POSIX: `[\w.-]+` stopped at the first
 // space, so `/home/jay/My Secret Co/proj/x` left `Secret` in the text and handed
 // `Co/proj` to SLUG, which rewrote it as `<repo>` -- a leaked path fragment
