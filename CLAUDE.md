@@ -39,6 +39,13 @@ say *read the script* rather than restating it.
   `SHA=$(gh pr view …) && gh api …`. And no `Bash(…)` rule reaches the `PowerShell` tool at all,
   which is what the reviewer uses on Windows. Grant bare tool names; deny what must not happen,
   because deny is evaluated before the mode and before any allow.
+- **A grant does not stop a prompt, and `dontAsk` turns a prompt into a refusal.** The
+  destructive-command check runs on a granted tool too. A `medium` reviewer that built a junction
+  and a probe file to reproduce two findings, then removed them, had two PowerShell calls refused
+  under `dontAsk` on a review that otherwise completed and posted (sdk-typescript#96). The spawn
+  uses `bypassPermissions`: nothing prompts, and the deny list still holds.
+- **`--no-post` at `low` has returned zero turns and an empty result** — exit 5 reported as
+  "inspected" with nothing to inspect. It did not reproduce the denials above; do not use it to.
 
 ## `spawnSync`
 

@@ -147,7 +147,14 @@ export function main(argv = process.argv.slice(2), deps = {}) {
   const claudeArgs = [
     '-p', prompt,
     '--output-format', 'json',
-    '--permission-mode', 'dontAsk',
+    // Not `dontAsk`. That mode turns every prompt into a refusal, and an
+    // allow grant does not stop the prompt: the destructive-command check runs
+    // on a granted tool too, so a reviewer that built a junction and a probe
+    // file to reproduce two findings and then removed them (sdk-typescript#96,
+    // 2026-09-04) had two PowerShell calls refused, on a review that otherwise
+    // completed and posted. Under `bypassPermissions` nothing prompts, and the
+    // deny list below still holds — deny is evaluated before the mode.
+    '--permission-mode', 'bypassPermissions',
     // Bare tool names. A prefix pattern matches a command string and the
     // reviewer composes shell, so `Bash(gh api:*)` never matches
     // `SHA=$(gh pr view ...) && gh api ...`; and on Windows it reaches for
