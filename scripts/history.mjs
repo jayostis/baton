@@ -17,6 +17,7 @@ import { readdirSync, readFileSync, existsSync, writeFileSync, appendFileSync, s
 import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { ledger } from './ledger.mjs'
+import { instant } from './lib/transcript.mjs'
 import { loadRoles } from './lib/roles.mjs'
 
 export const COLUMNS = ['epic', 'dates', 'agents', 'cost_units', 'merged_prs', 'units_per_pr', 'rounds_per_pr', 'walk_defects', 'wall_clock_hours']
@@ -48,8 +49,7 @@ export function unionHours(intervals) {
 }
 
 export function epicRows(projectsRoot, epics, roles = loadRoles()) {
-  const lowest = epics.map((e) => e.from).sort()[0]
-  const highest = nextDay(epics.map((e) => e.to).sort().at(-1))
+  const lowest = Math.min(...epics.map((e) => instant(e.from)))
   const got = new Map(epics.map((e) => [e.epic, []]))
   for (const proj of readdirSync(projectsRoot, { withFileTypes: true })) {
     if (!proj.isDirectory()) continue
@@ -57,7 +57,7 @@ export function epicRows(projectsRoot, epics, roles = loadRoles()) {
     for (const f of readdirSync(dir)) {
       if (!f.endsWith('.jsonl')) continue
       const main = join(dir, f)
-      if (statSync(main).mtime.toISOString().slice(0, 10) < lowest) continue
+      if (statSync(main).mtimeMs < lowest) continue
       const e = dominantEpic(readFileSync(main, 'utf8'), epics)
       if (!e) continue
       got.get(e.epic).push(...ledger(join(dir, basename(f, '.jsonl')), e.from, nextDay(e.to), roles, true))

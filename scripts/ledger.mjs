@@ -6,20 +6,19 @@
 //   node ledger.mjs --project <project-dir> --since <ISO> --until <ISO>      every session in a project folder
 //   node ledger.mjs <session-dir> --waves <waves.json> [--wave <name>]       slice and total by wave
 //   node ledger.mjs <session-dir> --agent <id-or-name-fragment>              one line, for a handback
-//   node ledger.mjs --self        the newest session in this directory's project folder; with two sessions open in one
-//                                 directory it may be the other, so pass the session dir then
+//   node ledger.mjs --self        this session (CLAUDE_CODE_SESSION_ID), else the newest in this directory's project folder
 //   node ledger.mjs ... --strict                                              exit 1 on a warning
 //
 // <session-dir> is ~/.claude/projects/<project>/<session-id>/ (its subagents/ and workflows/ are scanned); the
 // session's own transcript, <session-id>.jsonl beside it, is counted as the orchestrator. waves.json is
 // {"w1": {"from": "<ISO>", "to": "<ISO>", "budgetUnits": 5000000}}; an agent belongs to the wave its first turn
-// falls in. Warnings (an agent past the context ceiling, a wave past its budget) print to stderr; exit 1 only with
+// falls in. Warnings (an agent past the context ceiling or its role's tokenTarget, a wave past its budget) print to stderr; exit 1 only with
 // --strict. Cost units and the weights behind them are in references/roles.json.
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { join, basename, dirname } from 'node:path'
 import { homedir } from 'node:os'
-import { summarize, mainModel } from './lib/transcript.mjs'
+import { summarize, mainModel, instant } from './lib/transcript.mjs'
 import { loadRoles, units, show } from './lib/roles.mjs'
 
 function agents(dir) {
@@ -35,7 +34,7 @@ function agents(dir) {
   return rows
 }
 
-function describe(path, summary) {
+export function describe(path, summary) {
   const meta = path.replace(/\.jsonl$/, '.meta.json')
   if (existsSync(meta)) {
     try {
@@ -46,6 +45,38 @@ function describe(path, summary) {
   return summary.prompt.split('\n')[0].slice(0, 60) || '(no description)'
 }
 
+// An agent's role is the first word of the description it was dispatched with ("fix: w3 round 2"), when that word is
+// a key of the role table; any other description has no role and no target.
+export function roleOf(description, roles = loadRoles()) {
+  const word = String(description).trim().split(/[\s:]/)[0].toLowerCase()
+  return Object.hasOwn(roles.roles, word) ? word : null
+}
+
+export const tokensOf = (s) => s.input + s.cacheRead + s.cacheWrite + s.output
+
+// One agent's row. Shared by the ledger and the SubagentStop hook.
+export function agentRow(s, { id, name, roles = loadRoles() }) {
+  const model = mainModel(s).replace(/^claude-/, '')
+  return {
+    agent: name,
+    id,
+    role: name === 'orchestrator' ? 'orchestrator' : roleOf(name, roles),
+    model,
+    turns: s.turns,
+    peakContext: s.peakContext,
+    lastContext: s.lastContext,
+    input: s.input,
+    cacheRead: s.cacheRead,
+    cacheWrite: s.cacheWrite,
+    output: s.output,
+    tokens: tokensOf(s),
+    units: units(s, model, roles),
+    start: s.first,
+    end: s.last,
+    minutes: s.first && s.last ? Math.round((instant(s.last) - instant(s.first)) / 60000) : null,
+  }
+}
+
 // With clip, turns outside [since, until) are not counted at all; without it an agent is in or out whole.
 export function ledger(dir, since, until, roles = loadRoles(), clip = false) {
   const rows = []
@@ -54,25 +85,13 @@ export function ledger(dir, since, until, roles = loadRoles(), clip = false) {
   for (const path of files) {
     const s = summarize(path, clip ? { since, until } : undefined)
     if (!s || s.turns === 0) continue
-    if (since && s.last && s.last < since) continue
-    if (until && s.first && s.first > until) continue
-    const model = mainModel(s).replace(/^claude-/, '')
-    rows.push({
-      agent: path === main ? 'orchestrator' : describe(path, s),
+    if (since && s.last && instant(s.last) < instant(since)) continue
+    if (until && s.first && instant(s.first) > instant(until)) continue
+    rows.push(agentRow(s, {
       id: path === main ? basename(dir) : basename(path, '.jsonl').replace(/^agent-/, ''),
-      model,
-      turns: s.turns,
-      peakContext: s.peakContext,
-      lastContext: s.lastContext,
-      input: s.input,
-      cacheRead: s.cacheRead,
-      cacheWrite: s.cacheWrite,
-      output: s.output,
-      units: units(s, model, roles),
-      start: s.first,
-      end: s.last,
-      minutes: s.first && s.last ? Math.round((Date.parse(s.last) - Date.parse(s.first)) / 60000) : null,
-    })
+      name: path === main ? 'orchestrator' : describe(path, s),
+      roles,
+    }))
   }
   return rows.sort((a, b) => b.units - a.units)
 }
@@ -89,16 +108,19 @@ export function projectLedger(projectDir, since, until, roles = loadRoles()) {
   return rows.sort((a, b) => b.units - a.units)
 }
 
-// The session in this working directory: the newest transcript in its project folder, which is the one being written.
+// The session in this working directory: CLAUDE_CODE_SESSION_ID when the harness sets it, else the newest transcript in
+// its project folder, which with two sessions open in one directory may be the other.
 export function selfSession(cwd, home = homedir()) {
   const project = join(process.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), 'projects', cwd.replace(/[^A-Za-z0-9]/g, '-'))
   if (!existsSync(project)) return null
+  const id = process.env.CLAUDE_CODE_SESSION_ID
+  if (id && existsSync(join(project, `${id}.jsonl`))) return join(project, id)
   const newest = readdirSync(project).filter((f) => f.endsWith('.jsonl')).map((f) => ({ f, t: statSync(join(project, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0]
   return newest ? join(project, basename(newest.f, '.jsonl')) : null
 }
 
 export function inWave(row, wave) {
-  return row.start >= wave.from && (!wave.to || row.start < wave.to)
+  return instant(row.start) >= instant(wave.from) && (!wave.to || instant(row.start) < instant(wave.to))
 }
 
 export function waveTotals(rows, waves) {
@@ -108,9 +130,11 @@ export function waveTotals(rows, waves) {
   })
 }
 
-export function warnings(rows, totals, ceiling) {
+export function warnings(rows, totals, ceiling, roles = loadRoles()) {
   const out = []
   for (const r of rows) {
+    const target = r.role && roles.roles[r.role]?.tokenTarget
+    if (target && r.tokens > target) out.push(`${r.agent} (${r.id}) used ${k(r.tokens)} tokens, past the ${k(target)} token target of its role ${r.role}`)
     if (r.agent !== 'orchestrator' && r.peakContext > ceiling) out.push(`${r.agent} (${r.id}) peaked at ${Math.round(r.peakContext / 1000)}k context, past the ${Math.round(ceiling / 1000)}k ceiling`)
   }
   for (const t of totals) if (t.budget && t.units > t.budget) out.push(`wave ${t.name} used ${t.units} units against a budget of ${t.budget}`)
@@ -181,7 +205,7 @@ export function main(args) {
   }
   const totals = waveTotals(rows, wave ? { [flag('--wave')]: wave } : waves)
   console.log(args.includes('--json') ? JSON.stringify({ rows, waves: totals }, null, 2) : markdown(rows, totals, roles))
-  const warns = warnings(rows, totals, roles.ceilingTokens)
+  const warns = warnings(rows, totals, roles.ceilingTokens, roles)
   for (const w of warns) console.error(`warning: ${w}`)
   return warns.length && args.includes('--strict') ? 1 : 0
 }
