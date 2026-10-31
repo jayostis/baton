@@ -1,0 +1,47 @@
+name: Epic step
+description: One step of an epic. Lighter than agent-ready; the critical read checks all of them together before dispatch.
+title: "[step] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong or missing, observed, with the evidence. No fix.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: "In: what this step changes. Out: what it must not. Do not touch: files owned by another step."
+    validations:
+      required: true
+  - type: textarea
+    id: red
+    attributes:
+      label: Red first
+      description: The check that fails before the work and passes after, by file and name. If none can, say why.
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: By path and symbol, never by line number. Which repo each lives in.
+  - type: textarea
+    id: settled
+    attributes:
+      label: Settled
+      description: The settlement and decision sections that bind this step, cited by heading, with the seam names it must use.
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: What a person can do or see, in the real surface. The walk drives these.
+    validations:
+      required: true
+  - type: textarea
+    id: role
+    attributes:
+      label: Role and wave
+      description: Filled in by the critical read. A role from references/roles.json, a wave, and why if it is not Sonnet.
