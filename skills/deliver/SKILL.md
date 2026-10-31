@@ -8,8 +8,9 @@ description: Take an issue to a reviewed PR, verified locally, taken out of draf
 One issue in, one reviewed PR out, stopped short of merge. **Never asks a question in-session** —
 every blocker goes to GitHub. **Never merges.**
 
-**Agent names below are this plugin's own.** If your session lists them scoped —
-`baton:deliver-tests-agent` — spawn the scoped form.
+The agents below name their own model in their files (tests, followup: Sonnet; implement: Sonnet at high effort;
+checklist: Haiku). For an issue that calls the work design-heavy, pass `model: opus` on the implement agent.
+An epic is not run from here: [`/baton:epic`](../epic/SKILL.md) is its orchestrator, and it merges; this never does.
 
 ## Exit states
 
@@ -94,12 +95,12 @@ snapshot, and neither `EnterWorktree` nor `git switch` re-scans.
 **4 — Tests.** Neither `unit` nor `e2e` ticked → **skip to Implement.** A declared `e2e` in a
 worktree → **block** wherever the project serves E2E from one shared stack.
 
-Otherwise spawn [`deliver-tests-agent`](../../agents/deliver/deliver-tests-agent.md) with the
+Otherwise spawn `baton:deliver:deliver-tests-agent` ([file](../../agents/deliver/deliver-tests-agent.md)) with the
 issue's **Problem** and **Verification, verbatim and nothing else**. **Keep its report** — the
 implementer builds to the stubs it invented.
 
 **5 — Implement.** Spawn
-[`deliver-implement-agent`](../../agents/deliver/deliver-implement-agent.md) with **Problem**,
+`baton:deliver:deliver-implement-agent` ([file](../../agents/deliver/deliver-implement-agent.md)) with **Problem**,
 **Scope**, **Verification**, and the tests agent's report. **Anything it reports as blocked →
 block**, verbatim.
 
@@ -113,11 +114,11 @@ reviews and commits; that thread is the handover. Otherwise `gh pr create --draf
 <integration branch>` with `Closes #N` in the body. **Leave it a draft** — `gh pr ready` is
 step 9's.
 
-**7 — Review loop.** [`/baton:pr loop <pr>`](../pr/loop.md). Branch on its exit line and nothing
-else: `unfixed` or `blocked` → **block**, verbatim. `clean`, `stalled` or `exhausted` → Checklist.
+**7 — Review loop.** [`/baton:pr loop <pr>`](../pr/loop.md), one fix round. Branch on its exit line and
+nothing else: `unfixed` or `blocked` → **block**, verbatim. `clean`, `stalled` or `exhausted` → Checklist.
 
 **8 — Checklist.** Spawn
-[`deliver-checklist-agent`](../../agents/deliver/deliver-checklist-agent.md) with both numbers.
+`baton:deliver:deliver-checklist-agent` ([file](../../agents/deliver/deliver-checklist-agent.md)) with both numbers.
 **Anything it reports as declared but absent → block** — this is the only step that compares what
 the issue asked for against what the branch holds.
 

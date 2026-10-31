@@ -16,6 +16,9 @@ First hit wins:
 2. `${user_config.review_passes}`
 3. **2**
 
+**Solo use only.** In an epic the orchestrator never runs this verb: it burned the most time there, through false
+clean exits and overlapping relaunches. An epic reviews and fixes with fresh agents (`/baton:epic`).
+
 **More rounds is not more thorough.** Later rounds find few new true positives and generate
 speculative ones, because the easy findings are gone and the reviewer is still being asked for
 findings. Raising this buys noise the author then has to disprove. A last pass's findings are the

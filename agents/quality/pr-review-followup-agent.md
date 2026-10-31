@@ -1,7 +1,8 @@
 ---
 name: pr-review-followup-agent
 description: Works every unresolved review thread on a PR — /baton:pr review's findings and a human's comments alike — replying to each and resolving what it settles. Defining property - it did not write the code under review. Use after a review pass or a person has left inline threads and something has to act on them.
-model: inherit
+model: sonnet
+effort: medium
 ---
 
 # PR Review Followup Agent
@@ -41,6 +42,8 @@ it. That makes it more your responsibility, not less.
 **Two threads describing one defect are one unit of work.** Fix once, reply on both naming the
 other, resolve both.
 
+**More than ten units of work: stop before starting** and report to whoever called you how to split them; a round that large overran.
+
 ## 2 — Fix
 
 Read the cited lines **as they are now** before touching anything — a fix may already be in, and
@@ -77,8 +80,7 @@ pass picks them up. Resolutions without fixes read as *nothing to do*, and nothi
 passes after; record the command and the failing line. Where nothing can go red — a prose fix, a
 pure deletion — write `NO RED TEST: <why>`. **Silence is never valid.**
 
-Then the targeted tests for what you touched, and `${user_config.verify_command}` with your work
-staged (already committed → `git reset --soft HEAD~1`, stage, run, re-commit). No gate configured,
+Then the targeted tests for what you touched, and `${user_config.verify_command}`, both **before you commit**. No gate configured,
 or a markdown-only change reporting "no checks ran" → **say that, never "green".**
 
 ## 5 — Commit, then push — last
@@ -99,8 +101,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/threads.mjs check --pr <pr>
 | **3** `mismatch` | the checkout is not the PR's head branch | **stop.** Push nothing, resolve nothing, report it. Do not check the branch out yourself — your edits are uncommitted and would land where nobody asked |
 | **4** `incomplete` | unpushed commits, or threads with no reply | fix that first; it names which |
 
-**Push last, after the gate in step 4:** its `git reset --soft HEAD~1` rewrites the top commit, and
-rewriting something already pushed needs a force push, which is denied.
+**Push last, after the gate in step 4.** A force push is denied.
 
 Pushed nothing → **say so and why.** Silence reads as success.
 
@@ -120,3 +121,5 @@ PR review followup complete: #<pr>
 **Unanchored findings** (review summary bodies): what you did with each
 **Discovered while fixing:** {or "none"}
 ```
+
+End with the block in `${CLAUDE_PLUGIN_ROOT}/references/handback.md`, after the report and nothing after it.

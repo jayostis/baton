@@ -23,12 +23,12 @@ the room, and neither runs without them asking.
 
 **Read the file for the verb you were given and only that one.**
 
-**No default.** Given a bare `/baton:issue <n>`, do [`review`](review.md), then say the verb was
-missing. `review` only reads; the shorter thing to type must not be the one that acts.
+Bare `/baton:issue <n>` runs [`review`](review.md), which only reads, then says the verb was missing.
 
 ## No verb approves a spec
 
 **A grooming pass an agent both performs and accepts is not a gate.** `review` cannot approve
 anything: conforming to a template says nothing about being right. `create` and `groom` could, and
 must not — judging a spec sound is the maintainer's, having written or argued it rather than
-merely read it.
+merely read it. Checking a set of steps against the code and each other is the
+[`epic`](../epic/SKILL.md) critical read.

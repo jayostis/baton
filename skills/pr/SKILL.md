@@ -31,12 +31,8 @@ loading the others costs context for instructions you will not follow.
 
 ## No verb, no action
 
-**There is no default.** Given a bare `/baton:pr <pr>`, do [`status`](status.md), then stop and say the
-verb was missing, naming all six.
-
-They differ by how far they reach — nothing, the PR, the branch — and typing a skill's name is not
-consent to the widest of them. The shorter thing to type must not be the one that acts. Reporting
-first is what keeps the refusal useful: you see what is outstanding, then choose.
+Bare `/baton:pr <pr>` runs [`status`](status.md), which only reads, then says the verb was missing.
+Typing the skill's name is not consent to its widest verb.
 
 **An unrecognised verb is not a near miss to be guessed.** Say what you were given, name the six,
 and stop.

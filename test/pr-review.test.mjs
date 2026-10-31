@@ -61,12 +61,24 @@ test('the effort level is positional and comes BEFORE the PR number', () => {
   assert.ok(!claude.args.join(' ').includes('--effort'), '--effort is not an argument /code-review takes')
 })
 
+test('the reviewer model is named: sonnet by default, --model overrides', () => {
+  for (const [argv, want] of [[[], 'sonnet'], [['--model', 'opus'], 'opus']]) {
+    const run = fakeRun(healthy())
+    quiet(() => main(['--pr', '9', '--level', 'low', '--json', ...argv], { run }))
+    const args = run.calls.find(c => c.cmd === 'claude').args
+    assert.equal(args[args.indexOf('--model') + 1], want)
+  }
+})
+
 test('the headless invocation declares its tool surface and asks for JSON', () => {
   const run = fakeRun(healthy())
   quiet(() => main(['--pr', '9', '--level', 'low', '--json'], { run }))
   const args = run.calls.find(c => c.cmd === 'claude').args
   assert.ok(args.includes('--output-format') && args.includes('json'))
-  assert.ok(args.includes('--permission-mode') && args.includes('dontAsk'))
+  // bypassPermissions, not dontAsk: dontAsk refuses whatever would have
+  // prompted, and the destructive-command check prompts on a granted tool too.
+  assert.ok(args.includes('--permission-mode') && args.includes('bypassPermissions'))
+  assert.ok(!args.includes('dontAsk'))
   // Bare tool names: a prefix pattern cannot match composed shell, and no
   // Bash(...) rule can reach PowerShell at all.
   for (const t of ['Bash', 'PowerShell', 'Read', 'Grep', 'Glob']) assert.ok(args.includes(t), `missing grant ${t}`)

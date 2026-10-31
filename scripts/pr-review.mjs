@@ -37,7 +37,7 @@ function appendRun(opts, d) {
 }
 
 function parseArgs(argv) {
-  const out = { pr: null, level: null, repo: null, dir: process.cwd(), json: false, dryRun: false, noPost: false, noLog: false, save: null }
+  const out = { pr: null, level: null, repo: null, dir: process.cwd(), json: false, dryRun: false, noPost: false, noLog: false, save: null, model: 'sonnet' }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--pr') out.pr = argv[++i]
@@ -45,6 +45,10 @@ function parseArgs(argv) {
     else if (a === '--repo') out.repo = argv[++i]
     else if (a === '--dir') out.dir = argv[++i]
     else if (a === '--save') out.save = argv[++i]
+    else if (a === '--model') {
+      out.model = argv[++i]
+      if (!out.model || out.model.startsWith('--')) return { error: `--model needs a model name (sonnet or opus), got ${out.model ?? 'nothing'}` }
+    }
     else if (a === '--json') out.json = true
     else if (a === '--dry-run') out.dryRun = true
     else if (a === '--no-post') out.noPost = true
@@ -126,7 +130,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
   if (opts.error) {
     console.error(`pr-review: ${opts.error}`)
     console.error(`usage: pr-review.mjs --pr <n> --level <${LEVELS.join('|')}> [--dir <checkout>] [--repo owner/name]`)
-    console.error('       [--no-post] [--dry-run] [--json] [--save <file>] [--no-log]')
+    console.error('       [--model <sonnet|opus>] [--no-post] [--dry-run] [--json] [--save <file>] [--no-log]')
     return EXIT.PREFLIGHT
   }
 
@@ -146,8 +150,17 @@ export function main(argv = process.argv.slice(2), deps = {}) {
 
   const claudeArgs = [
     '-p', prompt,
+    // Named, never inherited: the settings default may be Opus, and a review of a small diff does not need it.
+    '--model', opts.model,
     '--output-format', 'json',
-    '--permission-mode', 'dontAsk',
+    // Not `dontAsk`. That mode turns every prompt into a refusal, and an
+    // allow grant does not stop the prompt: the destructive-command check runs
+    // on a granted tool too, so a reviewer that built a junction and a probe
+    // file to reproduce two findings and then removed them (sdk-typescript#96,
+    // 2026-09-04) had two PowerShell calls refused, on a review that otherwise
+    // completed and posted. Under `bypassPermissions` nothing prompts, and the
+    // deny list below still holds — deny is evaluated before the mode.
+    '--permission-mode', 'bypassPermissions',
     // Bare tool names. A prefix pattern matches a command string and the
     // reviewer composes shell, so `Bash(gh api:*)` never matches
     // `SHA=$(gh pr view ...) && gh api ...`; and on Windows it reaches for
