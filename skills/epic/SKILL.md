@@ -37,8 +37,8 @@ want a design call get Opus; nothing else does.
 
 **Waves.** Three to four agents at once; one at a time for anything that takes the Docker lock or times a run. Before
 a wave starts, add it to `waves.json` (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when
-its last PR merges. `budgetUnits` is in cost units; the role table's `tokenTarget` is in tokens (`tokenTargetUnit`), so
-the first budget is the sum of the wave's targets, a loose ceiling since most tokens are cache reads, and later ones
+its last PR merges. `budgetUnits` and the role table's `unitTarget` are both cost units, so
+the first budget is the sum of the wave's agents' targets, and later ones
 come from the ledger.
 
 **Dispatch.** Every general-purpose `Agent` call names `model` and `effort` from the role table, and starts its
@@ -91,7 +91,7 @@ standing rulings issue, with your lean, batched. Do not wait on an answer you ca
   (issue titles with links), what is waiting on them, reviews and skips named, the decisions made without them, and a
   usage line from the ledger (units, or a percent of the week once `roles.json` has a calibration).
 - Cost units are not tokens: weights per model and token kind are in `roles.json`, and each retro may recalibrate them.
-  The calibration is unset until the first retro sets it from the maintainer's usage meter.
+  Each retro resets the calibration from a fresh reading of the maintainer's usage meter.
 
 ## Your own context
 

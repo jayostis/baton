@@ -12,7 +12,7 @@
 // <session-dir> is ~/.claude/projects/<project>/<session-id>/ (its subagents/ and workflows/ are scanned); the
 // session's own transcript, <session-id>.jsonl beside it, is counted as the orchestrator. waves.json is
 // {"w1": {"from": "<ISO>", "to": "<ISO>", "budgetUnits": 5000000}}; an agent belongs to the wave its first turn
-// falls in. Warnings (an agent past the context ceiling or its role's tokenTarget, a wave past its budget) print to stderr; exit 1 only with
+// falls in. Warnings (an agent past the context ceiling or its role's unitTarget, a wave past its budget) print to stderr; exit 1 only with
 // --strict. Cost units and the weights behind them are in references/roles.json.
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
@@ -133,8 +133,8 @@ export function waveTotals(rows, waves) {
 export function warnings(rows, totals, ceiling, roles = loadRoles()) {
   const out = []
   for (const r of rows) {
-    const target = r.role && roles.roles[r.role]?.tokenTarget
-    if (target && r.tokens > target) out.push(`${r.agent} (${r.id}) used ${k(r.tokens)} tokens, past the ${k(target)} token target of its role ${r.role}`)
+    const target = r.role && roles.roles[r.role]?.unitTarget
+    if (target && r.units > target) out.push(`${r.agent} (${r.id}) used ${k(r.units)} units, past the ${k(target)} unit target of its role ${r.role}`)
     if (r.agent !== 'orchestrator' && r.peakContext > ceiling) out.push(`${r.agent} (${r.id}) peaked at ${Math.round(r.peakContext / 1000)}k context, past the ${Math.round(ceiling / 1000)}k ceiling`)
   }
   for (const t of totals) if (t.budget && t.units > t.budget) out.push(`wave ${t.name} used ${t.units} units against a budget of ${t.budget}`)

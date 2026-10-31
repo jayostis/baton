@@ -91,8 +91,8 @@ A project's own file lives in that project, never here.
   totals per wave against a budget in `waves.json`; `--agent <id>` prints the line for a handback; `--self` reads the
   orchestrator's own context; `--strict` exits 1 on an agent past the ceiling or a wave over budget.
 - **Cost units** weight each token kind and each model; the weights are in `roles.json` and are list-price ratios, not
-  measurements. The calibration from units to a percent of the week is **unset** until the first retro sets it from the
-  maintainer's usage meter; until then status lines show units.
+  measurements. The calibration from units to a percent of the week comes from the maintainer's usage meter
+  and is reset at each retro; with none set, status lines show units.
 - **Hooks**, `hooks/hooks.json`: `SendMessage` is refused to an agent that has handed back (a fresh agent is cheaper than
   resuming one; a message starting `RESUME-APPROVED:` passes); a message to a running agent always passes. In an
   epic only (`scripts/epic-mode.mjs on`, or `BATON_EPIC=1`), a general-purpose `Agent` call without a model is refused;

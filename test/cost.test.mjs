@@ -59,9 +59,10 @@ test('units show as a percent of the week only once the calibration is set', () 
   assert.equal(show(5_000_000, { ...roles, calibration: { unitsPerPercentOfWeek: 1_000_000 } }), '5.0% of the week (5.0M units)')
 })
 
-test('the shipped roles.json has a weight for every model its roles name and leaves calibration unset', () => {
+test('the shipped roles.json has a weight for every model its roles name and a calibration with its source', () => {
   const r = loadRoles()
-  assert.equal(r.calibration.unitsPerPercentOfWeek, null)
+  assert.ok(r.calibration.unitsPerPercentOfWeek > 0)
+  assert.match(r.calibration.note, /meter/)
   for (const [role, v] of Object.entries(r.roles)) assert.ok(r.weights.models[v.model], `${role} names ${v.model}, which has no weight`)
 })
 

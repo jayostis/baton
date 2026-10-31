@@ -1,26 +1,79 @@
 {
   "version": 1,
   "calibration": {
-    "unitsPerPercentOfWeek": null,
-    "note": "Unset. The first retro sets it from the maintainer's usage meter: percent of the week used across an epic, divided into that epic's units. Until then status lines show units, never a percent."
+    "unitsPerPercentOfWeek": 11200000,
+    "note": "Set 2026-10-31 from the weekly meter: 22% of the week used since the reset at 2026-10-30T20:00Z, against 246M units in every transcript since then (236M Opus). Recalibrate at each retro from a fresh meter reading."
   },
   "unit": "one uncached sonnet input token",
   "weights": {
     "note": "Starting values from list-price ratios (cache read 0.1x and cache write 1.25x of input, output 5x; opus 5/3 of sonnet, haiku 1/3, fable assumed equal to opus). Not measured against the weekly meter; a retro recalibrates them and says why.",
-    "kinds": { "input": 1, "cacheWrite": 1.25, "cacheRead": 0.1, "output": 5 },
-    "models": { "opus": 1.67, "sonnet": 1, "haiku": 0.33, "fable": 1.67, "unknown": 1.67 }
+    "kinds": {
+      "input": 1,
+      "cacheWrite": 1.25,
+      "cacheRead": 0.1,
+      "output": 5
+    },
+    "models": {
+      "opus": 1.67,
+      "sonnet": 1,
+      "haiku": 0.33,
+      "fable": 1.67,
+      "unknown": 1.67
+    }
   },
   "ceilingTokens": 200000,
-  "tokenTargetUnit": "tokens: input + cache read + cache write + output, summed over every turn of the agent; the ledger warns on an agent past its role's target",
   "waveBudgetUnits": null,
+  "unitTargetNote": "Cost units, as the ledger computes them, summed over every turn of the agent. Starting values from fresh single-pass agents measured 2026-10-30/31 (a Sonnet fix round 1.1M, an Opus review 1.6M, a Sonnet builder of a 44-file PR 3.2M); a retro moves them. The ledger warns on an agent past its role target.",
   "roles": {
-    "critical-read": { "model": "opus", "effort": "high", "tokenTarget": 600000, "brief": "critical-read.md" },
-    "builder": { "model": "sonnet", "effort": "high", "tokenTarget": 1500000, "brief": "builder.md", "note": "opus only where the critical read names the step design-heavy" },
-    "review-new-logic": { "model": "opus", "effort": "medium", "tokenTarget": 800000, "brief": "reviewer.md" },
-    "review-small": { "model": "sonnet", "effort": "medium", "tokenTarget": 300000, "brief": "reviewer.md" },
-    "fix": { "model": "sonnet", "effort": "medium", "tokenTarget": 400000, "brief": "fix.md", "note": "always a fresh agent, at most 10 findings" },
-    "mechanical": { "model": "haiku", "effort": "low", "tokenTarget": 100000, "brief": "mechanical.md" },
-    "walk": { "model": "sonnet", "effort": "medium", "tokenTarget": 800000, "brief": "walk.md" },
-    "orchestrator": { "model": "opus", "effort": "high", "tokenTarget": 3000000, "brief": "SKILL.md" }
+    "critical-read": {
+      "model": "opus",
+      "effort": "high",
+      "unitTarget": 4000000,
+      "brief": "critical-read.md"
+    },
+    "builder": {
+      "model": "sonnet",
+      "effort": "high",
+      "unitTarget": 3500000,
+      "brief": "builder.md",
+      "note": "opus only where the critical read names the step design-heavy"
+    },
+    "review-new-logic": {
+      "model": "opus",
+      "effort": "medium",
+      "unitTarget": 2000000,
+      "brief": "reviewer.md"
+    },
+    "review-small": {
+      "model": "sonnet",
+      "effort": "medium",
+      "unitTarget": 1000000,
+      "brief": "reviewer.md"
+    },
+    "fix": {
+      "model": "sonnet",
+      "effort": "medium",
+      "unitTarget": 1500000,
+      "brief": "fix.md",
+      "note": "always a fresh agent, at most 10 findings"
+    },
+    "mechanical": {
+      "model": "haiku",
+      "effort": "low",
+      "unitTarget": 200000,
+      "brief": "mechanical.md"
+    },
+    "walk": {
+      "model": "sonnet",
+      "effort": "medium",
+      "unitTarget": 2000000,
+      "brief": "walk.md"
+    },
+    "orchestrator": {
+      "model": "opus",
+      "effort": "high",
+      "unitTarget": 30000000,
+      "brief": "SKILL.md"
+    }
   }
 }
