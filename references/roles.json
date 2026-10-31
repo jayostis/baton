@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "calibration": {
+    "unitsPerPercentOfWeek": null,
+    "note": "Unset. The first retro sets it from Jay's usage meter: percent of the week used across an epic, divided into that epic's units. Until then status lines show units, never a percent."
+  },
+  "unit": "one uncached sonnet input token",
+  "weights": {
+    "note": "Starting values from list-price ratios (cache read 0.1x and cache write 1.25x of input, output 5x; opus 5/3 of sonnet, haiku 1/3). Not measured against the weekly meter; a retro recalibrates them and says why.",
+    "kinds": { "input": 1, "cacheWrite": 1.25, "cacheRead": 0.1, "output": 5 },
+    "models": { "opus": 1.67, "sonnet": 1, "haiku": 0.33, "unknown": 1.67 }
+  },
+  "ceilingTokens": 200000,
+  "waveBudgetUnits": null,
+  "roles": {
+    "critical-read": { "model": "opus", "effort": "high", "tokenTarget": 600000, "brief": "critical-read.md" },
+    "builder": { "model": "sonnet", "effort": "high", "tokenTarget": 1500000, "brief": "builder.md", "note": "opus only where the critical read names the step design-heavy" },
+    "review-new-logic": { "model": "opus", "effort": "medium", "tokenTarget": 800000, "brief": "reviewer.md" },
+    "review-small": { "model": "sonnet", "effort": "medium", "tokenTarget": 300000, "brief": "reviewer.md" },
+    "fix": { "model": "sonnet", "effort": "medium", "tokenTarget": 400000, "brief": "fix.md", "note": "always a fresh agent, at most 10 findings" },
+    "mechanical": { "model": "haiku", "effort": "low", "tokenTarget": 100000, "brief": "mechanical.md" },
+    "walk": { "model": "sonnet", "effort": "medium", "tokenTarget": 800000, "brief": "walk.md" },
+    "orchestrator": { "model": "opus", "effort": "high", "tokenTarget": 3000000, "brief": "SKILL.md" }
+  }
+}

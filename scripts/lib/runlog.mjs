@@ -1,7 +1,7 @@
 // One append-only stream per repository, written by every baton script without
 // being asked. An audit that reads only what someone remembered to save reports
-// impressions; one that reads a log reports facts. Draining it is the auditor's
-// job, not this file's -- a log nobody dispositions is how a friction log dies.
+// impressions; one that reads a log reports facts. Nothing drains it automatically;
+// what an agent cost is the ledger's, from transcripts.
 
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'

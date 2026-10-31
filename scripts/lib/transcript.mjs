@@ -40,3 +40,25 @@ export function summarize(path) {
 export function mainModel(summary) {
   return Object.entries(summary.models).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown'
 }
+
+// Has the agent handed back? Its last response ended the turn or called SubagentHandback, and nothing but tool
+// results has arrived since. A message sent after that resumes it from its whole transcript.
+export function isFinished(path) {
+  if (!existsSync(path)) return false
+  let last = null
+  let resumed = false
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line) continue
+    let record
+    try { record = JSON.parse(line) } catch { continue }
+    if (record.type === 'assistant' && record.message?.model !== '<synthetic>') { last = record; resumed = false }
+    else if (last && record.type === 'user') {
+      const content = record.message?.content
+      if (typeof content === 'string' || (Array.isArray(content) && content.some((c) => c.type !== 'tool_result'))) resumed = true
+    }
+  }
+  if (!last || resumed) return false
+  const content = Array.isArray(last.message?.content) ? last.message.content : []
+  return content.some((c) => c.type === 'tool_use' && c.name === 'SubagentHandback') ||
+    last.message?.stop_reason === 'end_turn' || last.message?.stop_reason === 'stop_sequence'
+}
