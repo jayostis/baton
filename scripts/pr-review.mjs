@@ -45,7 +45,10 @@ function parseArgs(argv) {
     else if (a === '--repo') out.repo = argv[++i]
     else if (a === '--dir') out.dir = argv[++i]
     else if (a === '--save') out.save = argv[++i]
-    else if (a === '--model') out.model = argv[++i]
+    else if (a === '--model') {
+      out.model = argv[++i]
+      if (!out.model || out.model.startsWith('--')) return { error: `--model needs a model name (sonnet or opus), got ${out.model ?? 'nothing'}` }
+    }
     else if (a === '--json') out.json = true
     else if (a === '--dry-run') out.dryRun = true
     else if (a === '--no-post') out.noPost = true

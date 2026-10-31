@@ -30,7 +30,7 @@ const THREADS_Q = `query($owner:String!,$name:String!,$pr:Int!){
   repository(owner:$owner,name:$name){ pullRequest(number:$pr){
     reviewThreads(first:100){ nodes{
       id isResolved isOutdated path line originalLine
-      comments(first:20){ nodes{ author{login} body createdAt } } } } } } }`
+      comments(first:20){ nodes{ author{login} body createdAt url } } } } } } }`
 
 // Variables, never interpolation. A reply body carries backticks, quotes and
 // newlines -- pasting one into a query string is how a well-argued reply
@@ -121,6 +121,7 @@ function main() {
     // where it was raised, and the flag says nothing about whether it holds.
     line: t.line ?? t.originalLine ?? null,
     outdated: t.isOutdated,
+    url: t.comments.nodes[0]?.url ?? null,
     comments: t.comments.nodes.map(c => ({ author: c.author?.login ?? null, body: c.body })),
   }))
 
@@ -164,7 +165,9 @@ function main() {
 }
 
 function out(o, d, code) {
-  const logged = appendRun('threads', d.repo, { cmd: o.cmd, ...d, exit: code })
+  // list is a read-only verb: its log line carries counts, never the thread or review bodies.
+  const { threads, summaryBodies, ...rest } = d
+  const logged = appendRun('threads', d.repo, { cmd: o.cmd, ...rest, ...(o.cmd === 'list' ? { threads: threads?.length ?? null, summaryBodies: summaryBodies?.length ?? null } : {}), exit: code })
   if (o.json || o.cmd === 'list') { console.log(JSON.stringify({ ...d, exit: code, runLog: logged }, null, 2)); return code }
   const L = [`threads ${o.cmd}: ${d.outcome.toUpperCase()} — ${d.reason}`]
   if (d.unansweredIds?.length) L.push('  no reply: ' + d.unansweredIds.join(', '))

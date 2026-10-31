@@ -13,7 +13,8 @@ the script's header, not a copy of its query here.
 cannot find, because Files changed omits it, and filtering on it hides live work. The script's `line` falls back to
 where the thread was raised, and `outdated` says which.
 
-One line per thread: `path:line` (marked **outdated** where it is), who wrote it, and the first line of the comment.
+One line per thread: `path:line` (marked **outdated** where it is), who wrote it, the first line of the comment, and
+the thread's `url`, so it can be opened.
 
 **A review's summary body is outstanding too, and no thread carries it** — see `summaryBodies`. Nothing can resolve
 one, so it closes only by whoever fixes it saying so. Most are empty.
