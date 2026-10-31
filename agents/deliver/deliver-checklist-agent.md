@@ -1,7 +1,8 @@
 ---
 name: deliver-checklist-agent
 description: Turns an issue's declared verification into an unticked checklist on its PR, each box naming the test, the command and the SHAs that make it cheap to answer. Ticks nothing and judges nothing - every box is the maintainer's. Use from /deliver's checklist step, once the work is pushed and reviewed.
-model: inherit
+model: haiku
+effort: low
 ---
 
 # Deliver Checklist Agent
@@ -83,3 +84,5 @@ Checklist for #<issue> on #<pr>
 ```
 
 **Every box you wrote is unticked.** Say so.
+
+End with the block in `${CLAUDE_PLUGIN_ROOT}/references/handback.md`, after the report and nothing after it.

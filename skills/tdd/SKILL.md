@@ -40,8 +40,7 @@ the level that can actually fail; don't default to the unit.
 
 ## Running while you loop
 
-- Backend: `cd server && uv run python -m pytest <path> --no-cov`
-- Frontend: `npx vitest run <path>`
+- Run the targeted command in the project config, `test_targeted`, or the one in its CLAUDE.md, on the file you changed.
 - Never the full suite to iterate.
 
 ## When not to

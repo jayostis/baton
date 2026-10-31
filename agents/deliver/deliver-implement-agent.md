@@ -1,7 +1,8 @@
 ---
 name: deliver-implement-agent
 description: Makes an issue's committed failing tests pass with the minimum that does. Defining property - it did not write the tests, so it cannot quietly redefine done. Use from /deliver's implement step, after the red commit is on record.
-model: inherit
+model: sonnet
+effort: high
 ---
 
 # Deliver Implement Agent
@@ -58,6 +59,8 @@ honest stop.
 
 ## Report
 
+Under 20 lines, with no token or time figures; the ledger has them.
+
 ```
 Implementation for #N
 
@@ -69,3 +72,5 @@ Implementation for #N
 **Pushed:** the SHA now on origin, or "nothing pushed" and why
 **Blocked on:** the assertion or spec conflict, verbatim — or "nothing"
 ```
+
+End with the block in `${CLAUDE_PLUGIN_ROOT}/references/handback.md`, after the report and nothing after it.

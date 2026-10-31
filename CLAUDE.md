@@ -11,7 +11,8 @@ that blocked every run on Windows. Both read as confident specifications. Both w
 
 The order is **script, run it, then write the prose** — never the reverse. A procedure with one
 right answer belongs in `scripts/`, where it can be executed; the file that describes it should
-say *read the script* rather than restating it.
+say *read the script* rather than restating it. A rule that has a script check is written as the script,
+not as a bullet: the epic hooks, the ledger and the brief caps in `test/briefs.test.mjs` are that rule applied.
 
 ## `/code-review`
 
@@ -70,11 +71,25 @@ breaks — and ESM module mocking in `node:test` still needs an experimental fla
 temp directory. Faking git would only test that we remember what git does, which is the thing we
 would get wrong.
 
+**Run the suite as `node --test test/*.test.mjs`.** The directory form, `node --test test/`, fails on Node 24.
+
 **CI has no `gh` auth and no `claude`.** Green means the logic is sound, never that the reviewer
 works. Only a live run establishes that, which is what the run log records.
 
 ## The run log
 
 Every script appends to `~/.claude/baton/runs/<owner>__<repo>.jsonl`, machine-written and free.
-`BATON_HOME` relocates it. Draining it is `/baton:audit`'s job — a log nobody dispositions is how
-a friction log dies.
+`BATON_HOME` relocates it. It records script runs, not agent cost, and nothing reads it automatically:
+there is no `/baton:audit`. What an epic cost is `scripts/ledger.mjs`, which reads the session transcripts;
+the retro reads the ledger.
+
+## The epic
+
+- **Briefs have word caps** (`test/briefs.test.mjs`): orchestrator 1,500, builder 500, reviewer 450, fix 200,
+  critical read 500, mechanical 150, walk and retro 400. `references/lessons.md` has a hard cap of 80 lines. A change
+  that needs more room first deletes something.
+- **Every dispatch names its model**, and `references/roles.json` is where the models and the cost weights live.
+  The weights are list-price ratios, not measurements, until a retro calibrates them.
+- **Hooks are `hooks/hooks.json`**, validated with `claude plugin validate`. A hook exits 2 to block and prints its
+  reason on stderr; the tests run the scripts as hooks do.
+- **A project brings a config file** (README, "Project config"). Nothing project-specific is in this repository.

@@ -3,7 +3,8 @@
 Posts a review to the PR. Changes no files, touches no branch.
 
 **A subprocess, not a subagent.** A reviewer holding the author's reasoning re-reads it
-approvingly; a subprocess cannot inherit this session's.
+approvingly; a subprocess cannot inherit this session's. An epic gets the same independence from a fresh read-only
+subagent (`/baton:epic`, `reviewer.md`), at lower overhead.
 
 ## 1 — Pick the effort
 
@@ -31,8 +32,11 @@ answering the last pass → `low`; anything else → `medium`.
 ## 2 — Run it
 
 ```bash
-node ${CLAUDE_PLUGIN_ROOT}/scripts/pr-review.mjs --pr <pr> --level <level> --dir <checkout>
+node ${CLAUDE_PLUGIN_ROOT}/scripts/pr-review.mjs --pr <pr> --level <level> --dir <checkout> [--model opus]
 ```
+
+**The reviewer runs on Sonnet unless `--model opus` is passed**: the session default may be Opus, and the script names
+the model rather than inherit it. Pass `opus` for a diff of new logic.
 
 **`--dir` must be a checkout of the repo that owns the PR.** The reviewer resolves a bare PR
 number against its working directory, so the directory is the target. `--repo owner/name` asserts

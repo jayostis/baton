@@ -4,7 +4,7 @@ Four questions, four lines, **reads only**. Nothing here posts, edits or pushes.
 
 ## The four
 
-**Threads** — unresolved count, from [`comments`](comments.md)'s query. `comments` is where you go
+**Threads** — the length of `threads` from [`comments`](comments.md)'s script call. `comments` is where you go
 for the list; this is the count.
 
 **Review** — has any pass left a finding, and did it see *this* head?

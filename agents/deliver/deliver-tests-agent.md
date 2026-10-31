@@ -1,7 +1,8 @@
 ---
 name: deliver-tests-agent
 description: Writes an issue's failing tests from its Problem and Verification alone, commits them red and pushes. Defining property - it has not seen the intended implementation, so the tests cannot be shaped to fit it. Use from /deliver's tests step; it never goes green.
-model: inherit
+model: sonnet
+effort: medium
 ---
 
 # Deliver Tests Agent
@@ -55,3 +56,5 @@ Tests written for #N
 
 **Every test you report is one you watched fail on its assertion.** A test you wrote and did not
 run is not a red test, and the run is the only thing that proves the assertion can fail.
+
+End with the block in `${CLAUDE_PLUGIN_ROOT}/references/handback.md`, after the report and nothing after it.

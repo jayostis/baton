@@ -8,8 +8,9 @@ description: Take an issue to a reviewed PR, verified locally, taken out of draf
 One issue in, one reviewed PR out, stopped short of merge. **Never asks a question in-session** —
 every blocker goes to GitHub. **Never merges.**
 
-**Agent names below are this plugin's own.** If your session lists them scoped —
-`baton:deliver-tests-agent` — spawn the scoped form.
+The agents below name their own model in their files (tests, followup: Sonnet; implement: Sonnet at high effort;
+checklist: Haiku). For an issue that calls the work design-heavy, pass `model: opus` on the implement agent.
+An epic is not run from here: [`/baton:epic`](../epic/SKILL.md) is its orchestrator, and it merges; this never does.
 
 ## Exit states
 
@@ -113,8 +114,8 @@ reviews and commits; that thread is the handover. Otherwise `gh pr create --draf
 <integration branch>` with `Closes #N` in the body. **Leave it a draft** — `gh pr ready` is
 step 9's.
 
-**7 — Review loop.** [`/baton:pr loop <pr>`](../pr/loop.md). Branch on its exit line and nothing
-else: `unfixed` or `blocked` → **block**, verbatim. `clean`, `stalled` or `exhausted` → Checklist.
+**7 — Review loop.** [`/baton:pr loop <pr>`](../pr/loop.md), one fix round. Branch on its exit line and
+nothing else: `unfixed` or `blocked` → **block**, verbatim. `clean`, `stalled` or `exhausted` → Checklist.
 
 **8 — Checklist.** Spawn
 [`deliver-checklist-agent`](../../agents/deliver/deliver-checklist-agent.md) with both numbers.

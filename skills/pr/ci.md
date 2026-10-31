@@ -34,7 +34,8 @@ gh run view <run-id> --log-failed
 and report.** Do not switch branches: this verb takes a number, and moving someone's tree is not
 in it.
 
-Fix the failure the log names, and nothing else. Run what you can locally to check the fix, commit,
+In an epic, never the agent that wrote the code: hand a log excerpt (`--log-failed`, the last 80 lines) to a fresh fix
+agent (`/baton:epic`, `fix.md`). Otherwise fix the failure the log names, and nothing else. Run what you can locally to check the fix, commit,
 push. **Then report and stop** — do not look for a new run. Whether a push triggers one is the
 project's business and the next invocation's question.
 
