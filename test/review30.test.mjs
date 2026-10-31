@@ -151,8 +151,8 @@ test('S4: history keeps a session stamped inside a window given by date', () => 
 })
 
 // S7
-test('S7: the role is the first word of the dispatch description; an agent past its role token target warns', () => {
-  const big = [turn('a', 700000), turn('b', 700000)]
+test('S7: the role is the first word of the dispatch description; an agent past its role unit target warns', () => {
+  const big = Array.from({ length: 40 },(_, i) => turn(`t${i}`, 700000))
   const { dir } = session([
     ['f1', [...big, ...big], { name: 'x', description: 'fix: w3 round 2' }],
     ['f2', [turn('z', 1000)], { name: 'y', description: 'fix: small' }],
@@ -162,10 +162,10 @@ test('S7: the role is the first word of the dispatch description; an agent past 
   const rows = ledger(dir)
   assert.equal(rows.find((r) => r.id === 'f1').role, 'fix')
   assert.equal(rows.find((r) => r.id === 'f3').role, null)
-  const out = warnings(rows, [], 10 ** 9, roles).filter((w) => /token target/.test(w))
+  const out = warnings(rows, [], 10 ** 9, roles).filter((w) => /unit target/.test(w))
   assert.equal(out.length, 1)
   assert.match(out[0], /f1/)
-  assert.match(roles.tokenTargetUnit, /tokens/)
+  assert.ok(Object.values(roles.roles).every((r) => r.unitTarget > 0))
 })
 
 // S8
