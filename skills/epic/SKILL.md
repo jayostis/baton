@@ -20,7 +20,9 @@ decision below was learned in an epic that ignored it; read the ledger, not your
    continue from it; GitHub is the record, this machine a cache.
 3. **Roles.** `${CLAUDE_PLUGIN_ROOT}/references/roles.json` is the table: role, model, effort, token target, brief.
    Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`. Read the table, do not restate it.
-4. **Lessons.** `${CLAUDE_PLUGIN_ROOT}/references/lessons.md`, tagged by role. Read the `[orchestrator]` and `[all]`
+4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which is what turns the
+   model rule on; `off` when the retro is done. Without it no dispatch is refused.
+5. **Lessons.** `${CLAUDE_PLUGIN_ROOT}/references/lessons.md`, tagged by role. Read the `[orchestrator]` and `[all]`
    lines now; each brief names the tag its agent reads.
 
 ## The loop
@@ -34,20 +36,26 @@ together against the code. Apply its must-fixes to the issues. It also assigns e
 want a design call get Opus; nothing else does.
 
 **Waves.** Three to four agents at once; one at a time for anything that takes the Docker lock or times a run. Before
-a wave starts, add it to `waves.json` (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) with a budget from the
-token targets in the role table. Close it with `"to"` when its last PR merges.
+a wave starts, add it to `waves.json` (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when
+its last PR merges. `budgetUnits` is in cost units; the role table's `tokenTarget` is in tokens (`tokenTargetUnit`), so
+the first budget is the sum of the wave's targets, a loose ceiling since most tokens are cache reads, and later ones
+come from the ledger.
 
-**Dispatch.** Every `Agent` call names `model`, from the table, and the `PreToolUse` hook refuses one that does not.
-The prompt is: line 1 the step (`<repo>#<n> <title>`), line 2 the absolute path of the role's brief, line 3 the
-step file path, then the absolute plugin root (`${CLAUDE_PLUGIN_ROOT}`, which the briefs' `references/` paths hang from), then only what you hold that the issue does not (rulings, seam names, suites that cannot go green
-yet), once, up front. Before dispatching a fix, name the code path that shows the behaviour; five minutes of
+**Dispatch.** Every general-purpose `Agent` call names `model` and `effort` from the role table, and starts its
+`description` with the role key (`fix: w3 round 2`), which is how the ledger knows the role; the `PreToolUse` hook
+refuses an unnamed model. The prompt has five lines for every role: 1 the subject (`<repo>#<n> <title>`, the PR, or the
+command), 2 the absolute path of the role's brief, 3 the input file (step file, findings file, success exit code; blank
+if none), 4 the absolute plugin root (`${CLAUDE_PLUGIN_ROOT}`, which the briefs' `references/` paths hang from), 5 the absolute
+path of the project config. Then only what you hold that the issue does not (rulings, seam names, suites that cannot go
+green yet), once, up front. Before dispatching a fix, name the code path that shows the behaviour; five minutes of
 grep is cheaper than a round.
 
 **Handback.** The agent ends with the block in `${CLAUDE_PLUGIN_ROOT}/references/handback.md`. Run
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs <session-dir> --agent <id>`, paste its line above the block in
 `run.md`, and keep the block's one proposed change for the retro. A report is model output: check the repo.
 Builders hand back once. Nothing is sent to an agent that has handed back; a fix round is a fresh agent. The
-`SendMessage` hook enforces both that and the context ceiling.
+`SendMessage` hook enforces that; a message to a running agent always passes, so a stop reaches it. A `SubagentStop`
+hook appends each agent's ledger row to the run log.
 
 **CI.** One blocking command, run in the background by you (or by a `mechanical` agent when it is more than one
 command), using the project's `wait_ci` tool. Nobody polls and no builder waits. Red goes to a fresh `fix` agent with
@@ -78,7 +86,7 @@ standing rulings issue, with your lean, batched. Do not wait on an answer you ca
 
 - Run `ledger.mjs <session-dir> --waves <epic>/waves.json --strict` at the end of each wave and whenever a
   status is due. It prints cost units per agent, per model and per wave against the budget, and warns on an agent past
-  the context ceiling.
+  the context ceiling or past its role's token target.
 - Status to the maintainer, at wave boundaries and whenever a budget is exceeded, not every message: what merged
   (issue titles with links), what is waiting on them, reviews and skips named, the decisions made without them, and a
   usage line from the ledger (units, or a percent of the week once `roles.json` has a calibration).

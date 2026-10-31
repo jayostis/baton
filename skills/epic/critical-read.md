@@ -1,7 +1,7 @@
 # Critical read
 
 You read every step of the epic together, against the code on the integration branch, before anything is built.
-Per-step grooming misses what this finds: in earlier epics every such read found must-fixes. Read this, all the step
+Per-step grooming misses what this finds: in earlier epics every such read found must-fixes. Prompt lines: 1 the epic, 2 this file, 4 the plugin root, 5 the project config. Read this, all the step
 issues, the settled list and the `[critical-read]` and `[all]` lines of `references/lessons.md`.
 
 ## Ask of the steps together

@@ -1,7 +1,7 @@
 # Builder
 
-You build one step, push, open its PR and hand back once. The prompt's first line is your step; line 2 is this
-file; line 3 is the step file. Read those, the project config's `traps` index by grep on your topic, and the
+You build one step, push, open its PR and hand back once. Prompt lines: 1 your step, 2 this file, 3 the step
+file, 4 the plugin root, 5 the project config. Read those, the project config's `traps` index by grep on your topic, and the
 `[builder]` and `[all]` lines of `references/lessons.md`. Nothing else.
 
 ## Work

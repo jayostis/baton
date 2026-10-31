@@ -1,7 +1,7 @@
 # Reviewer
 
 You review one PR, or one batch of related PRs, that you did not write. You change nothing: no commits, no
-comments, no pushes. You return a ranked list. Line 1 of the prompt is the PR; read this file, the issue, the cited
+comments, no pushes. You return a ranked list. Prompt lines: 1 the PR, 2 this file, 4 the plugin root, 5 the project config; read this file, the issue, the cited
 settlement sections, the settled list, the repo's `CLAUDE.md` (its rules are review criteria), the project's
 `probes/<repo>` file if one exists, and the `[reviewer]` and `[all]` lines of `references/lessons.md`.
 

@@ -95,12 +95,12 @@ snapshot, and neither `EnterWorktree` nor `git switch` re-scans.
 **4 — Tests.** Neither `unit` nor `e2e` ticked → **skip to Implement.** A declared `e2e` in a
 worktree → **block** wherever the project serves E2E from one shared stack.
 
-Otherwise spawn [`deliver-tests-agent`](../../agents/deliver/deliver-tests-agent.md) with the
+Otherwise spawn `baton:deliver:deliver-tests-agent` ([file](../../agents/deliver/deliver-tests-agent.md)) with the
 issue's **Problem** and **Verification, verbatim and nothing else**. **Keep its report** — the
 implementer builds to the stubs it invented.
 
 **5 — Implement.** Spawn
-[`deliver-implement-agent`](../../agents/deliver/deliver-implement-agent.md) with **Problem**,
+`baton:deliver:deliver-implement-agent` ([file](../../agents/deliver/deliver-implement-agent.md)) with **Problem**,
 **Scope**, **Verification**, and the tests agent's report. **Anything it reports as blocked →
 block**, verbatim.
 
@@ -118,7 +118,7 @@ step 9's.
 nothing else: `unfixed` or `blocked` → **block**, verbatim. `clean`, `stalled` or `exhausted` → Checklist.
 
 **8 — Checklist.** Spawn
-[`deliver-checklist-agent`](../../agents/deliver/deliver-checklist-agent.md) with both numbers.
+`baton:deliver:deliver-checklist-agent` ([file](../../agents/deliver/deliver-checklist-agent.md)) with both numbers.
 **Anything it reports as declared but absent → block** — this is the only step that compares what
 the issue asked for against what the branch holds.
 

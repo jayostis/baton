@@ -1,7 +1,7 @@
 # Walk
 
 The epic's PRs are merged. You use what shipped, the way a person would, because tests did not find the defects the
-walks of earlier epics found. Read this, the epic's issues (each "Done when"), and the `[walk]` and `[all]` lines of
+walks of earlier epics found. Prompt lines: 1 the epic, 2 this file, 4 the plugin root, 5 the project config. Read this, the epic's issues (each "Done when"), and the `[walk]` and `[all]` lines of
 `references/lessons.md`.
 
 - Be alone on the machine: no other agent is running. The orchestrator guarantees it; if you see one, stop.
