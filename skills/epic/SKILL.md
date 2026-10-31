@@ -24,6 +24,13 @@ decision below was learned in an epic that ignored it; read the ledger, not your
    model rule on; `off` when the retro is done. Without it no dispatch is refused.
 5. **Lessons.** `${CLAUDE_PLUGIN_ROOT}/references/lessons.md`, tagged by role. Read the `[orchestrator]` and `[all]`
    lines now; each brief names the tag its agent reads.
+6. **Merge permission.** Ask the maintainer for it now, in chat, as your first message after reading the
+   config: "May I merge this epic's PRs through the gate and run its release steps, for this session?" A grant in an
+   earlier session or a handoff does not carry: auto mode reads only this conversation and refuses the merge without
+   it. Record the answer and its date under Authority in `HANDOFF.md`, and do not ask again in this session. While
+   you wait, plan and dispatch; only merges wait. Also check that `gh auth status` lists the `workflow` scope, since
+   a PR that edits `.github/workflows/` cannot merge without it; if it is missing, ask the maintainer to run
+   `gh auth refresh -h github.com -s workflow` in the same message.
 
 ## The loop
 
@@ -69,9 +76,9 @@ and the partner heads, so it does not rediscover them.
 **Fix.** A fresh `fix` agent, brief `fix.md`, given the findings file and the branch, not the history. More than ten
 findings: split into two agents. It posts one PR comment and pushes. Never `/baton:pr loop` in an epic.
 
-**Merge.** Only through the project's `gate`, only after the maintainer has said in chat that you may, with the date
-recorded in `HANDOFF.md`. The gate reads state itself (mergeability, checks on the current head, threads, a review for
-this head); a report from an agent is never the gate. No `--admin`. Pairs merge back to back.
+**Merge.** Only through the project's `gate`, only with the permission asked for at Start (step 6), granted in this
+session's chat and recorded with its date in `HANDOFF.md`. The gate reads state itself (mergeability, checks on
+the current head, threads, a review for this head); a report from an agent is never the gate. No `--admin`. Pairs merge back to back.
 
 **Walk.** When the last PR is merged, the `walk` role, `walk.md`, drives what shipped. Its findings become issues;
 count them for the retro.
