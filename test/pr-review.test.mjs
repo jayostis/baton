@@ -61,6 +61,15 @@ test('the effort level is positional and comes BEFORE the PR number', () => {
   assert.ok(!claude.args.join(' ').includes('--effort'), '--effort is not an argument /code-review takes')
 })
 
+test('the reviewer model is named: sonnet by default, --model overrides', () => {
+  for (const [argv, want] of [[[], 'sonnet'], [['--model', 'opus'], 'opus']]) {
+    const run = fakeRun(healthy())
+    quiet(() => main(['--pr', '9', '--level', 'low', '--json', ...argv], { run }))
+    const args = run.calls.find(c => c.cmd === 'claude').args
+    assert.equal(args[args.indexOf('--model') + 1], want)
+  }
+})
+
 test('the headless invocation declares its tool surface and asks for JSON', () => {
   const run = fakeRun(healthy())
   quiet(() => main(['--pr', '9', '--level', 'low', '--json'], { run }))

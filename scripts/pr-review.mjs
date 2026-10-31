@@ -37,7 +37,7 @@ function appendRun(opts, d) {
 }
 
 function parseArgs(argv) {
-  const out = { pr: null, level: null, repo: null, dir: process.cwd(), json: false, dryRun: false, noPost: false, noLog: false, save: null }
+  const out = { pr: null, level: null, repo: null, dir: process.cwd(), json: false, dryRun: false, noPost: false, noLog: false, save: null, model: 'sonnet' }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--pr') out.pr = argv[++i]
@@ -45,6 +45,7 @@ function parseArgs(argv) {
     else if (a === '--repo') out.repo = argv[++i]
     else if (a === '--dir') out.dir = argv[++i]
     else if (a === '--save') out.save = argv[++i]
+    else if (a === '--model') out.model = argv[++i]
     else if (a === '--json') out.json = true
     else if (a === '--dry-run') out.dryRun = true
     else if (a === '--no-post') out.noPost = true
@@ -126,7 +127,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
   if (opts.error) {
     console.error(`pr-review: ${opts.error}`)
     console.error(`usage: pr-review.mjs --pr <n> --level <${LEVELS.join('|')}> [--dir <checkout>] [--repo owner/name]`)
-    console.error('       [--no-post] [--dry-run] [--json] [--save <file>] [--no-log]')
+    console.error('       [--model <sonnet|opus>] [--no-post] [--dry-run] [--json] [--save <file>] [--no-log]')
     return EXIT.PREFLIGHT
   }
 
@@ -146,6 +147,8 @@ export function main(argv = process.argv.slice(2), deps = {}) {
 
   const claudeArgs = [
     '-p', prompt,
+    // Named, never inherited: the settings default may be Opus, and a review of a small diff does not need it.
+    '--model', opts.model,
     '--output-format', 'json',
     // Not `dontAsk`. That mode turns every prompt into a refusal, and an
     // allow grant does not stop the prompt: the destructive-command check runs
