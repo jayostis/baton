@@ -51,5 +51,5 @@
 [fix] Reply to a thread after fixing, resolve only after the push; a resolution is a claim the fix is on the head.
 [fix] Run verify_command before committing; resetting a pushed commit needs a force push, which is denied.
 [mechanical] Do not repair or retry a failed command; a half-fix pushed over a red build is worse than the red build.
-[walk] Walking the shipped thing found what tests did not in six epics, once 507 records written into the wrong pod.
+[walk] Walking the shipped thing found what tests did not in six epics, once 507 records written to the wrong destination.
 [walk] Save evidence under a path with no spaces; a space breaks the clickable link to it.

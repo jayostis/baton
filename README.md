@@ -77,8 +77,7 @@ lines. The briefs refer to its entries by these names; each is a command, a path
 | `probes` | per-repository probe lists for reviewers |
 | `locks` | the lock primitive for Docker and timed runs |
 
-The Cascade project's file lives outside this repository (its data about one user's projects stays out of a public
-repo).
+A project's own file lives in that project, never here.
 
 ## Running an epic
 
