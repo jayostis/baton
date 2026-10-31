@@ -9,7 +9,9 @@ export function contextOf(usage) {
 }
 
 // A response streamed in several records repeats its usage on each; count it once, by message id.
-export function summarize(path) {
+// With a window, only turns stamped inside [since, until) are counted, so a long session cut to one epic's dates costs
+// that epic only what it spent there.
+export function summarize(path, window) {
   const out = { turns: 0, models: {}, cacheRead: 0, cacheWrite: 0, input: 0, output: 0, peakContext: 0, lastContext: 0, first: null, last: null, prompt: '' }
   if (!existsSync(path)) return null
   const seen = new Set()
@@ -17,6 +19,7 @@ export function summarize(path) {
     if (!line) continue
     let record
     try { record = JSON.parse(line) } catch { continue }
+    if (window && record.timestamp && ((window.since && record.timestamp < window.since) || (window.until && record.timestamp >= window.until))) continue
     if (record.timestamp) { out.first ??= record.timestamp; out.last = record.timestamp }
     if (!out.prompt && record.type === 'user' && typeof record.message?.content === 'string') out.prompt = record.message.content
     const usage = record.message?.usage

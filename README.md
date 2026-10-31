@@ -99,7 +99,9 @@ repo).
   model. `BATON_CONTEXT_CEILING` and `BATON_REQUIRE_MODEL=0` adjust them.
 - **Lessons**, `references/lessons.md`: one-line rules tagged by role, capped at 80 lines by a test.
 - **Retro**, `skills/epic/retro.md`: runs the ledger, compares with the project's `epics.csv`, reads the handback blocks and
-  opens one PR to this repository. The maintainer merges it; nothing updates itself.
+  opens one PR to this repository. The maintainer merges it; nothing updates itself. `scripts/history.mjs` builds
+  `epics.csv` rows from a spec of epics (attributing each session to the epic its transcript names most), which is also
+  how epics that ran before the ledger can be backfilled approximately.
 
 ## What a project has to bring
 

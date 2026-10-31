@@ -46,12 +46,13 @@ function describe(path, summary) {
   return summary.prompt.split('\n')[0].slice(0, 60) || '(no description)'
 }
 
-export function ledger(dir, since, until, roles = loadRoles()) {
+// With clip, turns outside [since, until) are not counted at all; without it an agent is in or out whole.
+export function ledger(dir, since, until, roles = loadRoles(), clip = false) {
   const rows = []
   const main = join(dirname(dir), `${basename(dir)}.jsonl`)
   const files = existsSync(main) && statSync(main).isFile() ? [main, ...agents(dir)] : agents(dir)
   for (const path of files) {
-    const s = summarize(path)
+    const s = summarize(path, clip ? { since, until } : undefined)
     if (!s || s.turns === 0) continue
     if (since && s.last && s.last < since) continue
     if (until && s.first && s.first > until) continue
