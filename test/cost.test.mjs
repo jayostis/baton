@@ -150,7 +150,7 @@ test('an agent that handed back is finished; one messaged since, or still workin
 })
 
 test('the hook refuses a message to a finished agent, lets RESUME-APPROVED through, and lets a running agent be corrected', () => {
-  const { transcript } = session([['done', [turn('d1', 1000), handback('d2'), toolResult], { name: 'builder-2' }], ['busy', [turn('b1', 1000)]]])
+  const { transcript } = session([['done', [turn('d1', 1000), handback('d2'), toolResult], { name: 'builder-2', finished: true }], ['busy', [turn('b1', 1000)]]])
   const send = (to, message) => verdict({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to, message } }, 200000)
   const refused = send('builder-2', 'please also fix X')
   assert.equal(refused.block, true)
@@ -160,31 +160,31 @@ test('the hook refuses a message to a finished agent, lets RESUME-APPROVED throu
 })
 
 test('run as a hook, the script exits 2 with the reason on stderr to block, and 0 to allow or on bad input', () => {
-  const { transcript } = session([['big', [turn('b1', 250000)]]])
+  const { transcript } = session([['big', [turn('b1', 250000)], { finished: true }]])
   const hook = fileURLToPath(new URL('../scripts/context-ceiling.mjs', import.meta.url))
   const run = (input) => spawnSync(process.execPath, [hook], { input, encoding: 'utf8' })
   const blocked = run(JSON.stringify({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to: 'big', message: 'x' } }))
   assert.equal(blocked.status, 2)
   assert.match(blocked.stderr, /250k context/)
-  assert.equal(run(JSON.stringify({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to: 'nobody' } })).status, 0)
+  assert.equal(run(JSON.stringify({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to: 'nobody', message: 'x' } })).status, 0)
   assert.equal(run('').status, 0)
   assert.equal(run('not json').status, 0)
 })
 
 test('the model hook refuses an Agent call naming no model, and passes a named one, a fork, a baton agent and the off switch', () => {
-  const v = (tool_input, env = {}) => modelVerdict({ tool_name: 'Agent', tool_input }, env)
+  const v = (tool_input, env = {}) => modelVerdict({ tool_name: 'Agent', tool_input }, env, true)
   assert.equal(v({ prompt: 'x' }).block, true)
   assert.match(v({ prompt: 'x' }).reason, /critical-read=opus.*mechanical=haiku/)
   assert.equal(v({ prompt: 'x', model: 'sonnet' }).block, false)
   assert.equal(v({ subagent_type: 'fork' }).block, false)
   assert.equal(v({ subagent_type: 'baton:quality:pr-review-followup-agent' }).block, false)
   assert.equal(v({ prompt: 'x' }, { BATON_REQUIRE_MODEL: '0' }).block, false)
-  assert.equal(modelVerdict({ tool_name: 'Bash', tool_input: {} }, {}).block, false)
+  assert.equal(modelVerdict({ tool_name: 'Bash', tool_input: {} }, {}, true).block, false)
 })
 
 test('run as a hook, the model script exits 2 for an unnamed model and 0 for a named one', () => {
   const hook = fileURLToPath(new URL('../scripts/require-model.mjs', import.meta.url))
-  const run = (tool_input) => spawnSync(process.execPath, [hook], { input: JSON.stringify({ tool_name: 'Agent', tool_input }), encoding: 'utf8', env: { ...process.env, BATON_REQUIRE_MODEL: '1' } })
+  const run = (tool_input) => spawnSync(process.execPath, [hook], { input: JSON.stringify({ tool_name: 'Agent', tool_input }), encoding: 'utf8', env: { ...process.env, BATON_REQUIRE_MODEL: '1', BATON_EPIC: '1' } })
   assert.equal(run({ prompt: 'x' }).status, 2)
   assert.match(run({ prompt: 'x' }).stderr, /no model named/)
   assert.equal(run({ prompt: 'x', model: 'haiku' }).status, 0)

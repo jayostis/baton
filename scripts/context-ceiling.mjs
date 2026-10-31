@@ -1,16 +1,15 @@
 #!/usr/bin/env node
-// PreToolUse hook on SendMessage. Two refusals, both about resuming an agent:
-//   1. An agent that has already handed back is not resumed. A fresh agent given the findings and the branch costs a
-//      fraction of the resumed one (58k against 208k, epic 343); in the care-gaps epic five builders resumed four to
-//      nine times were three quarters of a 1.1B-token day. A message that begins "RESUME-APPROVED:" gets through, for
-//      the rare correction the orchestrator decides is worth the cost.
-//   2. An agent past the ceiling is not sent more work, whether or not it has handed back. The ceiling is
-//      BATON_CONTEXT_CEILING tokens, ceilingTokens in references/roles.json by default.
+// PreToolUse hook on SendMessage: an agent that has already handed back is not resumed. A fresh agent given the
+// findings and the branch costs a fraction of the resumed one (58k against 208k in one measured epic); resumed
+// builders were most of an expensive day in another. A message that begins "RESUME-APPROVED:" gets through, for the
+// rare correction the orchestrator decides is worth the cost. A message to an agent that is still running always
+// passes, however large its context: "stop and hand back" must reach it. The ceiling (BATON_CONTEXT_CEILING tokens,
+// ceilingTokens in references/roles.json by default) is named in the refusal and flagged by the ledger.
 //
 // Exit 0 lets the message through; exit 2 blocks it and its stderr goes back to the session as the reason.
 // Anything it cannot resolve (a peer session, a teammate, a missing transcript) is let through.
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import { summarize, isFinished } from './lib/transcript.mjs'
 import { loadRoles } from './lib/roles.mjs'
@@ -20,38 +19,34 @@ export function findAgent(sessionTranscript, to) {
   if (!to || !existsSync(dir)) return null
   const direct = join(dir, `agent-${to}.jsonl`)
   if (existsSync(direct)) return direct
+  // A name can be reused; the latest agent to carry it is the one SendMessage reaches.
+  let best = null
   for (const file of readdirSync(dir)) {
     if (!file.endsWith('.meta.json')) continue
     try {
-      const meta = JSON.parse(readFileSync(join(dir, file), 'utf8'))
-      if (meta.name === to) return join(dir, file.replace(/\.meta\.json$/, '.jsonl'))
+      const metaPath = join(dir, file)
+      if (JSON.parse(readFileSync(metaPath, 'utf8')).name !== to) continue
+      const at = statSync(metaPath).mtimeMs
+      if (!best || at > best.at) best = { at, path: join(dir, file.replace(/\.meta\.json$/, '.jsonl')) }
     } catch {}
   }
-  return null
+  return best?.path ?? null
 }
 
 export function verdict(input, ceiling) {
-  if (input.tool_name !== 'SendMessage' || !input.transcript_path) return { block: false }
-  const path = findAgent(input.transcript_path, input.tool_input?.to)
+  const message = input.tool_input?.message
+  if (input.tool_name !== 'SendMessage' || !input.transcript_path || !message) return { block: false }
+  const to = String(input.tool_input.to || '').replace(/\s*\[[^\]]*\]\s*$/, '')
+  const path = findAgent(input.transcript_path, to)
   const summary = path && summarize(path)
-  if (!summary) return { block: false }
-  const approved = /^\s*RESUME-APPROVED:/.test(input.tool_input?.message || '')
-  if (!approved && isFinished(path)) {
-    return {
-      block: true,
-      reason:
-        `Not sent: ${input.tool_input.to} has already handed back (${summary.turns} turns, ${Math.round(summary.lastContext / 1000)}k context), ` +
-        'and a message resumes it from all of that. Start a fresh agent with the branch, the findings and the model the role table names. ' +
-        'If the correction is worth the cost, begin the message with "RESUME-APPROVED:" and say why.',
-    }
-  }
-  if (summary.lastContext <= ceiling) return { block: false }
+  if (!summary || !isFinished(path) || /^\s*RESUME-APPROVED:/.test(message)) return { block: false }
+  const over = summary.lastContext > ceiling ? `, past the ${Math.round(ceiling / 1000)}k ceiling` : ''
   return {
     block: true,
     reason:
-      `Not sent: ${input.tool_input.to} is at ${Math.round(summary.lastContext / 1000)}k context ` +
-      `(ceiling ${Math.round(ceiling / 1000)}k, ${summary.turns} turns so far). Every further turn re-reads all of it. ` +
-      'Start a fresh agent instead: give it the branch, the findings or the handoff note, and the model the role table names.',
+      `Not sent: ${to} has already handed back (${summary.turns} turns, ${Math.round(summary.lastContext / 1000)}k context${over}), ` +
+      'and a message resumes it from all of that. Start a fresh agent with the branch, the findings and the model the role table names. ' +
+      'If the correction is worth the cost, begin the message with "RESUME-APPROVED:" and say why.',
   }
 }
 

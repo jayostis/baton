@@ -48,10 +48,10 @@ test('--since drops agents that finished before it', () => {
   assert.deepEqual(ledger(dir, '2026-10-20T00:00:00Z').map((r) => r.agent), ['orchestrator'])
 })
 
-test('the ceiling blocks a message to an agent past it, by id or by name', () => {
-  const { transcript } = session([['big', [turn('b1', 250000)], { name: 'builder-1' }]])
+test('a finished agent past the ceiling is refused with its size, by id or by name', () => {
+  const { transcript } = session([['big', [turn('b1', 250000)], { name: 'builder-1', finished: true }]])
   for (const to of ['big', 'builder-1']) {
-    const v = verdict({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to } }, 200000)
+    const v = verdict({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to, message: 'more' } }, 200000)
     assert.equal(v.block, true)
     assert.match(v.reason, /250k context/)
   }
@@ -60,7 +60,7 @@ test('the ceiling blocks a message to an agent past it, by id or by name', () =>
 test('the ceiling lets through an agent under it, and anything it cannot resolve', () => {
   const { transcript } = session([['small', [turn('s1', 150000)]]])
   for (const to of ['small', 'a-peer-session', undefined]) {
-    assert.equal(verdict({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to } }, 200000).block, false)
+    assert.equal(verdict({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to, message: 'x' } }, 200000).block, false)
   }
   assert.equal(verdict({ tool_name: 'Agent', transcript_path: transcript, tool_input: {} }, 200000).block, false)
 })

@@ -7,9 +7,12 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+export function batonHome() {
+  return process.env.BATON_HOME || process.env.CLAUDE_PLUGIN_DATA || join(homedir(), '.claude', 'baton')
+}
+
 export function runLogPath(repo) {
-  const base = process.env.BATON_HOME || process.env.CLAUDE_PLUGIN_DATA || join(homedir(), '.claude', 'baton')
-  const dir = join(base, 'runs')
+  const dir = join(batonHome(), 'runs')
   mkdirSync(dir, { recursive: true })
   return join(dir, `${String(repo || 'unknown').replace(/[^A-Za-z0-9._-]/g, '__')}.jsonl`)
 }

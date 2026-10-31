@@ -4,6 +4,9 @@
 
 import { readFileSync, existsSync } from 'node:fs'
 
+// Timestamps are compared as instants: an offset ISO string (2026-10-30T19:00:00-07:00) does not sort as one.
+export const instant = (s) => (s ? Date.parse(s) : NaN)
+
 export function contextOf(usage) {
   return (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0)
 }
@@ -19,7 +22,10 @@ export function summarize(path, window) {
     if (!line) continue
     let record
     try { record = JSON.parse(line) } catch { continue }
-    if (window && record.timestamp && ((window.since && record.timestamp < window.since) || (window.until && record.timestamp >= window.until))) continue
+    if (window && record.timestamp) {
+      const at = instant(record.timestamp)
+      if ((window.since && at < instant(window.since)) || (window.until && at >= instant(window.until))) continue
+    }
     if (record.timestamp) { out.first ??= record.timestamp; out.last = record.timestamp }
     if (!out.prompt && record.type === 'user' && typeof record.message?.content === 'string') out.prompt = record.message.content
     const usage = record.message?.usage
@@ -44,10 +50,17 @@ export function mainModel(summary) {
   return Object.entries(summary.models).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown'
 }
 
-// Has the agent handed back? Its last response ended the turn or called SubagentHandback, and nothing but tool
-// results has arrived since. A message sent after that resumes it from its whole transcript.
+// Has the agent handed back? The harness records it: the agent's meta.json carries `finished: true` once it has and
+// no such key while it runs, so with a meta file that is the answer. An end_turn in the transcript is not: an agent
+// waiting on a background task ends its turn dozens of times and is still working. Only with no meta file does the
+// transcript decide: its last response ended the turn or called SubagentHandback, and nothing but tool results has
+// arrived since. A message sent after that resumes it from its whole transcript.
 export function isFinished(path) {
   if (!existsSync(path)) return false
+  const meta = path.replace(/\.jsonl$/, '.meta.json')
+  if (existsSync(meta)) {
+    try { return JSON.parse(readFileSync(meta, 'utf8')).finished === true } catch {}
+  }
   let last = null
   let resumed = false
   for (const line of readFileSync(path, 'utf8').split('\n')) {
