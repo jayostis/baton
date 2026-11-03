@@ -1,59 +1,64 @@
 {
   "version": 1,
   "calibration": {
-    "unitsPerPercentOfWeek": 11200000,
-    "note": "Set 2026-10-31 from the weekly meter: 22% of the week used since the reset at 2026-10-30T20:00Z, against 246M units in every transcript since then (236M Opus). Recalibrate at each retro from a fresh meter reading."
+    "unitsPerPercentOfWeek": 10100000,
+    "note": "Set 2026-11-03 from three meter readings of the week that reset 2026-10-30T20:00Z, against every transcript on the machine cut to the window (ledger.mjs --all --since <reset> --until <reading> --clip): 22% at 202.3M units, 29% at 278.9M, 41% at 414.3M. 414.3M / 41 = 10.1M. Under the old weights the same readings gave 11.3M, 11.8M and 12.9M per percent, drifting more. The meter also counts requests no transcript holds (on 2026-11-03 it showed 57M more Opus cache reads and 6M more Haiku input than the transcripts), so this ratio absorbs them. Recalibrate at each retro from a fresh reading."
   },
   "unit": "one uncached sonnet input token",
   "weights": {
-    "note": "Starting values from list-price ratios (cache read 0.1x and cache write 1.25x of input, output 5x; opus 5/3 of sonnet, haiku 1/3, fable assumed equal to opus). Not measured against the weekly meter; a retro recalibrates them and says why.",
+    "note": "Set 2026-11-03 from list prices (opus-5-5 $4/$20, sonnet-5-5 $2/$10, haiku-5-5 $0.10/$0.50, fable-5-1 $10/$50 per million input/output) and checked against the meter's dollars for session 28675dc0: its sonnet line (409.7M cache read, 8.2M cache write, 2.2M output, $83.46) fits only with cache reads at 0.05x of input and writes at 1.25x, and its opus line at those ratios gives $186 against $191.53. Fable's cache reads are 0.025x of its input, so its units overstate them twice over. Haiku prompts past 100k tokens cost 5x, which haiku 0.05 does not show.",
     "kinds": {
       "input": 1,
       "cacheWrite": 1.25,
-      "cacheRead": 0.1,
+      "cacheRead": 0.05,
       "output": 5
     },
     "models": {
-      "opus": 1.67,
+      "opus": 2,
       "sonnet": 1,
-      "haiku": 0.33,
-      "fable": 1.67,
-      "unknown": 1.67
+      "haiku": 0.05,
+      "fable": 5,
+      "unknown": 2
     }
   },
   "ceilingTokens": 200000,
+  "handoff": {
+    "freshSessionTokens": 60000,
+    "minimumUnitsSaved": 2500000,
+    "note": "ledger.mjs --self --waves <file>, at a wave boundary only: the orchestrator's last context minus a fresh session's, times the last wave's turns, as cache reads. A fresh or compacted orchestrator started at 47-69k in session 28675dc0. There, at wave 7's opening (194k), a handoff would have saved 40.4M re-read tokens over the next 302 turns, 4.0M units; at wave 6's close (216k after 95 turns) 1.5M. The threshold, a quarter of a percent of the week, hands off at the first and not the second."
+  },
   "waveBudgetUnits": null,
-  "unitTargetNote": "Cost units, as the ledger computes them, summed over every turn of the agent. Starting values from fresh single-pass agents measured 2026-10-30/31 (a Sonnet fix round 1.1M, an Opus review 1.6M, a Sonnet builder of a 44-file PR 3.2M); a retro moves them. The ledger warns on an agent past its role target.",
+  "unitTargetNote": "Yardsticks, not caps: no agent can see its own usage, so a target changes nothing while the agent runs. The ledger flags an agent past its target for the retro to explain. Set 2026-11-03 near the 90th percentile of each role over this epic's sessions 837ef843 and 28675dc0, in the new units (builder: 29 agents, median 1.9M, p90 5.5M; fix: 56, median 0.31M, p90 0.64M; review-new-logic: 23, p90 1.8M; review-small: 28, p90 0.29M; critical read: 4, max 2.6M). What crossed them were Opus builders and steps that spanned repos. Walk had no data and was converted at the Sonnet ratio (0.6). Mechanical and orchestrator are kept: one mechanical ran (0.13M), and the orchestrator of 28675dc0 came to 31.7M, about 4M of it from the handoff missed at wave 7.",
   "roles": {
     "critical-read": {
       "model": "opus",
       "effort": "high",
-      "unitTarget": 4000000,
+      "unitTarget": 3000000,
       "brief": "critical-read.md"
     },
     "builder": {
       "model": "sonnet",
       "effort": "high",
-      "unitTarget": 3500000,
+      "unitTarget": 5500000,
       "brief": "builder.md",
       "note": "opus only where the critical read names the step design-heavy"
     },
     "review-new-logic": {
       "model": "opus",
       "effort": "medium",
-      "unitTarget": 2000000,
+      "unitTarget": 1800000,
       "brief": "reviewer.md"
     },
     "review-small": {
       "model": "sonnet",
       "effort": "medium",
-      "unitTarget": 1000000,
+      "unitTarget": 300000,
       "brief": "reviewer.md"
     },
     "fix": {
       "model": "sonnet",
       "effort": "medium",
-      "unitTarget": 1500000,
+      "unitTarget": 750000,
       "brief": "fix.md",
       "note": "always a fresh agent, at most 10 findings"
     },
@@ -66,7 +71,7 @@
     "walk": {
       "model": "sonnet",
       "effort": "medium",
-      "unitTarget": 2000000,
+      "unitTarget": 1200000,
       "brief": "walk.md"
     },
     "orchestrator": {
