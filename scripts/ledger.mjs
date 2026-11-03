@@ -6,8 +6,14 @@
 //   node ledger.mjs --project <project-dir> --since <ISO> --until <ISO>      every session in a project folder
 //   node ledger.mjs <session-dir> --waves <waves.json> [--wave <name>]       slice and total by wave
 //   node ledger.mjs <session-dir> --agent <id-or-name-fragment>              one line, for a handback
-//   node ledger.mjs --self        this session (CLAUDE_CODE_SESSION_ID), else the newest in this directory's project folder
+//   node ledger.mjs --self [--waves <waves.json>]   one line: this session's last context and, with waves, whether to hand off
+//   node ledger.mjs --all --since <ISO> --until <ISO> --clip                 every session on the machine, cut to the window
+//   node ledger.mjs ... --clip                                                count only turns inside --since/--until
 //   node ledger.mjs ... --strict                                              exit 1 on a warning
+//
+// --self finds this session by CLAUDE_CODE_SESSION_ID in every project folder, so it works from any directory; with no
+// id it falls back to the newest transcript in this directory's project folder. --all with --clip is how a retro
+// calibrates: the week's units over the meter's percent.
 //
 // <session-dir> is ~/.claude/projects/<project>/<session-id>/ (its subagents/ and workflows/ are scanned); the
 // session's own transcript, <session-id>.jsonl beside it, is counted as the orchestrator. waves.json is
@@ -97,26 +103,68 @@ export function ledger(dir, since, until, roles = loadRoles(), clip = false) {
 }
 
 // Every session in a project folder: a <session>.jsonl, with or without a <session>/ folder of agents beside it.
-export function projectLedger(projectDir, since, until, roles = loadRoles()) {
+export function projectLedger(projectDir, since, until, roles = loadRoles(), clip = false) {
   const ids = new Set()
   for (const e of readdirSync(projectDir, { withFileTypes: true })) {
     if (e.isDirectory()) ids.add(e.name)
     else if (e.name.endsWith('.jsonl')) ids.add(basename(e.name, '.jsonl'))
   }
   const rows = []
-  for (const id of ids) rows.push(...ledger(join(projectDir, id), since, until, roles))
+  for (const id of ids) rows.push(...ledger(join(projectDir, id), since, until, roles, clip))
   return rows.sort((a, b) => b.units - a.units)
 }
 
-// The session in this working directory: CLAUDE_CODE_SESSION_ID when the harness sets it, else the newest transcript in
-// its project folder, which with two sessions open in one directory may be the other.
+const projectsRoot = (home) => join(process.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), 'projects')
+
+// Every project folder on the machine. The weekly meter counts all of them, so calibration reads all of them.
+export function allLedger(since, until, roles = loadRoles(), clip = false, home = homedir()) {
+  const root = projectsRoot(home)
+  if (!existsSync(root)) return []
+  const rows = []
+  for (const e of readdirSync(root, { withFileTypes: true })) if (e.isDirectory()) rows.push(...projectLedger(join(root, e.name), since, until, roles, clip))
+  return rows.sort((a, b) => b.units - a.units)
+}
+
+// This session: CLAUDE_CODE_SESSION_ID, looked up in every project folder, since the orchestrator's shell is often in
+// another directory (run from the epic's root it printed the usage line and nothing else). With no id, the newest
+// transcript in the working directory's project folder, which with two sessions open in one directory may be the other.
 export function selfSession(cwd, home = homedir()) {
-  const project = join(process.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), 'projects', cwd.replace(/[^A-Za-z0-9]/g, '-'))
-  if (!existsSync(project)) return null
+  const root = projectsRoot(home)
+  if (!existsSync(root)) return null
   const id = process.env.CLAUDE_CODE_SESSION_ID
-  if (id && existsSync(join(project, `${id}.jsonl`))) return join(project, id)
+  if (id) {
+    const own = join(root, cwd.replace(/[^A-Za-z0-9]/g, '-'))
+    for (const folder of [own, ...readdirSync(root).map((n) => join(root, n))]) if (existsSync(join(folder, `${id}.jsonl`))) return join(folder, id)
+  }
+  const project = join(root, cwd.replace(/[^A-Za-z0-9]/g, '-'))
+  if (!existsSync(project)) return null
   const newest = readdirSync(project).filter((f) => f.endsWith('.jsonl')).map((f) => ({ f, t: statSync(join(project, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0]
   return newest ? join(project, basename(newest.f, '.jsonl')) : null
+}
+
+// The orchestrator's own line. Every turn re-reads the last context, so that, not the peak, is what continuing costs; a
+// compaction resets it and the peak stays. With waves, the most recent wave's turn count stands in for the next wave's:
+// handing off would re-read (last - freshSessionTokens) fewer tokens on each of them. Hand off when that saving is at
+// least handoff.minimumUnitsSaved.
+export function selfLine(sessionDir, waves = {}, roles = loadRoles()) {
+  const main = `${sessionDir}.jsonl`
+  const s = summarize(main)
+  if (!s || s.turns === 0) return null
+  const model = mainModel(s).replace(/^claude-/, '')
+  const kt = (n) => `${Math.round(n / 1000)}k`
+  const head = `orchestrator ${basename(sessionDir)}: last context ${kt(s.lastContext)} (each turn re-reads it), peak ${kt(s.peakContext)}, ${s.turns} turns.`
+  const named = Object.entries(waves).sort((a, b) => instant(a[1].from) - instant(b[1].from))
+  if (!named.length) return { line: `${head} Pass --waves <file> for the handoff estimate.`, handOff: null }
+  const [name, wave] = named[named.length - 1]
+  const turns = summarize(main, { since: wave.from, until: wave.to }).turns
+  const { freshSessionTokens, minimumUnitsSaved } = roles.handoff
+  const saved = units({ cacheRead: Math.max(0, s.lastContext - freshSessionTokens) * turns }, model, roles)
+  const handOff = saved >= minimumUnitsSaved
+  return {
+    line: `${head} Wave ${name}: ${turns} turns; a fresh session starts near ${kt(freshSessionTokens)}, and over as many turns ` +
+      `would save ${show(saved, roles)}. Hand off at the wave boundary: ${handOff ? 'yes' : 'no'} (threshold ${show(minimumUnitsSaved, roles)}).`,
+    handOff,
+  }
 }
 
 export function inWave(row, wave) {
@@ -178,13 +226,24 @@ export function main(args) {
   const valued = new Set(['--since', '--until', '--waves', '--wave', '--agent', '--project'])
   const dir = args.find((a, i) => !a.startsWith('--') && !valued.has(args[i - 1]))
   const projectDir = flag('--project')
-  const target = args.includes('--self') ? selfSession(process.cwd()) : projectDir || dir
-  if (!target || !(existsSync(target) || existsSync(`${target}.jsonl`))) {
-    console.error('usage: ledger.mjs <session-dir> | --project <project-dir>  [--since <ISO>] [--until <ISO>] [--waves <file> [--wave <name>]] [--agent <fragment>] [--json] [--strict]')
+  const all = args.includes('--all')
+  const self = args.includes('--self')
+  const target = self ? dir || selfSession(process.cwd()) : projectDir || dir
+  if (!all && (!target || !(existsSync(target) || existsSync(`${target}.jsonl`)))) {
+    console.error('usage: ledger.mjs <session-dir> | --project <project-dir> | --all | --self  [--since <ISO>] [--until <ISO>] [--clip] [--waves <file> [--wave <name>]] [--agent <fragment>] [--json] [--strict]')
     return 2
   }
   const roles = loadRoles()
   const waves = flag('--waves') ? JSON.parse(readFileSync(flag('--waves'), 'utf8')) : {}
+  if (self) {
+    const out = selfLine(target, waves, roles)
+    if (!out) {
+      console.error(`no turns in ${target}.jsonl`)
+      return 2
+    }
+    console.log(out.line)
+    return 0
+  }
   const wave = flag('--wave') ? waves[flag('--wave')] : undefined
   if (flag('--wave') && !wave) {
     console.error(`no wave "${flag('--wave')}" in ${flag('--waves') || '(no --waves file given)'}`)
@@ -192,7 +251,8 @@ export function main(args) {
   }
   const since = wave ? wave.from : flag('--since')
   const until = wave ? wave.to : flag('--until')
-  let rows = projectDir ? projectLedger(projectDir, since, until, roles) : ledger(target, since, until, roles)
+  const clip = args.includes('--clip')
+  let rows = all ? allLedger(since, until, roles, clip) : projectDir ? projectLedger(projectDir, since, until, roles, clip) : ledger(target, since, until, roles, clip)
   if (wave) rows = rows.filter((r) => inWave(r, wave))
   if (flag('--agent')) {
     const line = agentLine(rows, flag('--agent'))

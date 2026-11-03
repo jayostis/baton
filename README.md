@@ -88,11 +88,12 @@ A project's own file lives in that project, never here.
   small diff Sonnet; fix always a fresh Sonnet at medium effort with at most ten findings; mechanical steps Haiku.
 - **Ledger**, `scripts/ledger.mjs`: reads the session transcripts, so it costs no tokens and needs no token. Per agent: turns,
   peak context, cache read and write, output, minutes, and **cost units**. Slices with `--since`, `--until`, `--wave`;
-  totals per wave against a budget in `waves.json`; `--agent <id>` prints the line for a handback; `--self` reads the
-  orchestrator's own context; `--strict` exits 1 on an agent past the ceiling or a wave over budget.
-- **Cost units** weight each token kind and each model; the weights are in `roles.json` and are list-price ratios, not
-  measurements. The calibration from units to a percent of the week comes from the maintainer's usage meter
-  and is reset at each retro; with none set, status lines show units.
+  totals per wave against a budget in `waves.json`; `--agent <id>` prints the line for a handback; `--self --waves <file>`
+  prints the orchestrator's last context and whether to hand off at this wave boundary; `--all --clip` reads every
+  session on the machine inside a window, for calibration; `--strict` exits 1 on an agent past the ceiling or a wave over budget.
+- **Cost units** weight each token kind and each model; the weights in `roles.json` are list-price ratios, checked
+  against the meter's dollars. The calibration from units to a percent of the week comes from the maintainer's usage
+  meter and is reset at each retro; with none set, status lines show units.
 - **Hooks**, `hooks/hooks.json`: `SendMessage` is refused to an agent that has handed back (a fresh agent is cheaper than
   resuming one; a message starting `RESUME-APPROVED:` passes); a message to a running agent always passes. In an
   epic only (`scripts/epic-mode.mjs on`, or `BATON_EPIC=1`), a general-purpose `Agent` call without a model is refused;
