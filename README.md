@@ -66,8 +66,7 @@ lines. The briefs refer to its entries by these names; each is a command, a path
 
 | entry | what it is |
 |---|---|
-| `gate` | the only merge path: reads state itself (mergeability, checks on the head, threads, a review for this head) |
-| `wait_ci` | one blocking command that exits 0 only when every check on the head SHA passed |
+| `run_folders` | the folder epics' run folders live in; a bare epic name means `<run_folders>/<name>`, and without it the skill asks |
 | `worktree`, `review_worktree` | tools that give a builder a worktree per step and a reviewer a standing one |
 | `verify_command`, `test_targeted` | the pre-push gate, and how to run only the tests a change affects |
 | `depends_on` | how PRs in different repos name each other, and the order they merge |
@@ -86,6 +85,10 @@ A project's own file lives in that project, never here.
 - **Role table**, `references/roles.json`: role, model, effort, token target, brief. Every dispatch names its model; the
   `Agent` hook refuses one that does not. Defaults: critical read Opus; builder Sonnet; review of new logic Opus, of a
   small diff Sonnet; fix always a fresh Sonnet at medium effort with at most ten findings; mechanical steps Haiku.
+- **Gate and CI wait**, `scripts/gate.sh` and `scripts/wait-ci.sh`, both `<owner/repo>` and `gh` only. `gate.sh <owner/repo> <pr>
+  [--merge] [--allow <check>]...` is the only merge path: it reads mergeability, checks on the head and threads itself, and
+  never bypasses BLOCKED, UNKNOWN or BEHIND. `wait-ci.sh <owner/repo> <pr>|--commit <sha>` blocks until every run on the
+  head finishes and exits 0 only when all passed or were skipped.
 - **Ledger**, `scripts/ledger.mjs`: reads the session transcripts, so it costs no tokens and needs no token. Per agent: turns,
   peak context, cache read and write, output, minutes, and **cost units**. Slices with `--since`, `--until`, `--wave`;
   totals per wave against a budget in `waves.json`; `--agent <id>` prints the line for a handback; `--self --waves <file>`

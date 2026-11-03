@@ -1,14 +1,13 @@
 # Retro
 
-Run it when the walk is done, in the orchestrator session, and finish with one PR. Nothing here updates itself.
+Run it when the walk is done, in the orchestrator session, and finish with one PR.
 
 1. **Ledger.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs <session-dir> --waves <epic>/waves.json`. Keep the
    per-agent table, the per-wave totals and the total units.
-2. **History.** Append this epic to the project's `epics.csv` (columns: epic, dates, agents, cost units, merged PRs,
-   units per PR, rounds per PR, defects found by the walk, wall clock) and compare with the rows above it. Where
+2. **History.** Append this epic to the project's `epics.csv` and compare with the rows above it. Where
    this epic is far from the others, say which agent or round explains it. `node ${CLAUDE_PLUGIN_ROOT}/scripts/history.mjs --spec <file>
    --out <epics.csv> --append` computes the row from a spec (the header of `scripts/history.mjs` has its fields); you
-   supply merged PRs and the walk's defect count. A second row for one epic needs its own spec file: two rows with
+   supply merged PRs and defects. A second row for one epic needs its own spec file: two rows with
    one `match` tie, and a tie drops the session from both.
 3. **Handbacks.** Read every handback block in `run.md`: the waits, what cost a round, the proposed changes. Count
    proposals made more than once.
@@ -26,3 +25,5 @@ Run it when the walk is done, in the orchestrator session, and finish with one P
    reason no longer holds or that caught nothing this epic. Change a model or target only for evidence in the ledger.
 7. **Test and open.** `node --test test/*.test.mjs`. The PR body lists each change with the number behind it and ends
    with what the maintainer must decide. The maintainer merges.
+8. **Clean up.** After the retro PR merges, check that nothing in the run folder is the only copy of something lasting
+   (design, research, results): post it to the epic issue first. Then delete the run folder.

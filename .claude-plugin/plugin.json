@@ -51,7 +51,7 @@
     "project_config": {
       "type": "file",
       "title": "Project config for epics",
-      "description": "A markdown file naming the project's gate, CI wait, worktree tools, verify command, Depends-On pairing, rulings and probe files. Blank: /baton:epic looks for .baton/project.md in the repository.",
+      "description": "A markdown file naming run_folders, worktree tools, verify command, Depends-On pairing, rulings and probe files. Blank: /baton:epic looks for .baton/project.md in the repository.",
       "required": false
     }
   }
