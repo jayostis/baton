@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { summarize, isFinished } from '../scripts/lib/transcript.mjs'
 import { units, show, loadRoles } from '../scripts/lib/roles.mjs'
-import { ledger, projectLedger, allLedger, waveTotals, warnings, agentLine, main as ledgerMain, selfSession, selfLine } from '../scripts/ledger.mjs'
+import { ledger, projectLedger, allLedger, waveTotals, warnings, agentLine, main as ledgerMain, selfSession, selfLine, parseHandoffs, handoffCheck, rolePercentiles } from '../scripts/ledger.mjs'
 import { verdict } from '../scripts/context-ceiling.mjs'
 import { verdict as modelVerdict } from '../scripts/require-model.mjs'
 
@@ -249,4 +249,65 @@ test('allLedger reads every project folder, and with clip counts only the turns 
     assert.deepEqual(rows.map((r) => r.turns), [1, 1])
     assert.deepEqual(allLedger('2026-10-30T00:00:00Z', '2026-10-31T00:00:00Z', roles, false, home).map((r) => r.turns), [2, 2])
   })
+})
+
+test('a role can carry a unit target per model, and the ledger warns against the target of the model that ran', () => {
+  const R = { ...roles, roles: { builder: { unitTarget: 100, unitTargetByModel: { opus: 300 } } } }
+  const row = (model, units) => ({ agent: `builder: ${model}`, id: model + units, role: 'builder', model, units, peakContext: 0 })
+  const warned = (r) => warnings([r], [], 10 ** 9, R).filter((w) => /unit target/.test(w))
+  assert.equal(warned(row('sonnet-5-5', 200)).length, 1)
+  assert.equal(warned(row('opus-5-5', 200)).length, 0)
+  assert.match(warned(row('opus-5-5', 400))[0], /past the 300 unit target/)
+  const real = loadRoles().roles.builder
+  assert.ok(real.unitTargetByModel.opus > 0 && real.unitTarget > 0)
+})
+
+test('selfLine prints a decision line the retro can read back, and parseHandoffs reads it', () => {
+  const project = mkdtempSync(join(tmpdir(), 'self-'))
+  const dir = join(project, 'sess')
+  const at = (m) => `2026-10-30T10:${m}:00Z`
+  writeFileSync(`${dir}.jsonl`, [turn('a', 300_000, 'claude-opus-5-5', at('10')), turn('b', 300_000, 'claude-opus-5-5', at('20')), turn('c', 300_000, 'claude-opus-5-5', at('30'))].join('\n') + '\n')
+  const waves = { w1: { from: at('00'), to: '2026-10-30T11:00:00Z' } }
+  const R = (minimumUnitsSaved) => ({ ...roles, handoff: { freshSessionTokens: 60_000, minimumUnitsSaved } })
+  const log = selfLine(dir, waves, R(144_000)).log
+  assert.match(log, /^handoff-decision /)
+  assert.equal(selfLine(dir, {}, R(1)).log, null)
+  const no = selfLine(dir, waves, R(144_001)).log
+  const text = `# run\n\n- ${log}\nnoise\n- ${no}\n`
+  const [yes, nope] = parseHandoffs(text)
+  assert.deepEqual([yes.session, yes.wave, yes.lastContext, yes.turns, yes.predictedUnits, yes.handedOff], ['sess', 'w1', 300_000, 3, 144_000, true])
+  assert.equal(nope.handedOff, false)
+  assert.equal(parseHandoffs('nothing here').length, 0)
+})
+
+test('handoffCheck sets a decision against the next session: its mean context over the same number of turns', () => {
+  const project = mkdtempSync(join(tmpdir(), 'next-'))
+  const dir = join(project, 'next')
+  writeFileSync(`${dir}.jsonl`, [turn('a', 50_000, 'claude-opus-5-5'), turn('b', 70_000, 'claude-opus-5-5'), turn('c', 900_000, 'claude-opus-5-5')].join('\n') + '\n')
+  const d = { session: 'old', wave: 'w1', lastContext: 300_000, turns: 2, predictedUnits: 0, handedOff: true }
+  const R = { ...roles, handoff: { freshSessionTokens: 60_000, minimumUnitsSaved: 1 } }
+  const c = handoffCheck(d, dir, R)
+  assert.equal(c.nextTurns, 2)
+  assert.equal(c.meanContext, 60_000)
+  // what the old session would have re-read beyond the new one's mean, over the same turns: (300k - 60k) x 2, as cache reads
+  assert.equal(c.actualUnits, units({ cacheRead: 240_000 * 2 }, 'opus-5-5', R))
+  assert.equal(handoffCheck(d, join(project, 'absent'), R), null)
+})
+
+test('rolePercentiles gives the count, median and 90th percentile of each role and model, nearest rank', () => {
+  const rows = [...Array(10).keys()].map((i) => ({ role: 'builder', model: 'opus-5-5', units: (i + 1) * 100 }))
+  rows.push({ role: 'builder', model: 'sonnet-5-5', units: 50 }, { role: null, model: 'sonnet-5-5', units: 9 })
+  const p = rolePercentiles(rows, roles)
+  assert.deepEqual(p['builder opus'], { n: 10, median: 500, p90: 900, max: 1000 })
+  assert.deepEqual(p['builder sonnet'], { n: 1, median: 50, p90: 50, max: 50 })
+  assert.equal(Object.keys(p).length, 2)
+})
+
+test('summarize stops after maxTurns turns', () => {
+  const project = mkdtempSync(join(tmpdir(), 'max-'))
+  const path = join(project, 's.jsonl')
+  writeFileSync(path, [turn('a', 10), turn('b', 20), turn('c', 30)].join('\n') + '\n')
+  const s = summarize(path, { maxTurns: 2 })
+  assert.equal(s.turns, 2)
+  assert.equal(s.lastContext, 20)
 })
