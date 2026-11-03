@@ -252,12 +252,12 @@ test('allLedger reads every project folder, and with clip counts only the turns 
 })
 
 test('a role can carry a unit target per model, and the ledger warns against the target of the model that ran', () => {
-  const R = { ...roles, roles: { builder: { unitTarget: 100, unitTargetByModel: { opus: 300 } } } }
+  const R = { ...roles, roles: { builder: { unitTarget: 100_000, unitTargetByModel: { opus: 300_000 } } } }
   const row = (model, units) => ({ agent: `builder: ${model}`, id: model + units, role: 'builder', model, units, peakContext: 0 })
   const warned = (r) => warnings([r], [], 10 ** 9, R).filter((w) => /unit target/.test(w))
-  assert.equal(warned(row('sonnet-5-5', 200)).length, 1)
-  assert.equal(warned(row('opus-5-5', 200)).length, 0)
-  assert.match(warned(row('opus-5-5', 400))[0], /past the 300 unit target/)
+  assert.equal(warned(row('sonnet-5-5', 200_000)).length, 1)
+  assert.equal(warned(row('opus-5-5', 200_000)).length, 0)
+  assert.match(warned(row('opus-5-5', 400_000))[0], /past the 300k unit target of its role builder on opus/)
   const real = loadRoles().roles.builder
   assert.ok(real.unitTargetByModel.opus > 0 && real.unitTarget > 0)
 })

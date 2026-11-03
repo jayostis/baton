@@ -13,13 +13,14 @@ export function contextOf(usage) {
 
 // A response streamed in several records repeats its usage on each; count it once, by message id.
 // With a window, only turns stamped inside [since, until) are counted, so a long session cut to one epic's dates costs
-// that epic only what it spent there.
+// that epic only what it spent there. With window.maxTurns, only the first that many turns are counted.
 export function summarize(path, window) {
   const out = { turns: 0, models: {}, cacheRead: 0, cacheWrite: 0, input: 0, output: 0, peakContext: 0, lastContext: 0, first: null, last: null, prompt: '' }
   if (!existsSync(path)) return null
   const seen = new Set()
   for (const line of readFileSync(path, 'utf8').split('\n')) {
     if (!line) continue
+    if (window?.maxTurns && out.turns >= window.maxTurns) break
     let record
     try { record = JSON.parse(line) } catch { continue }
     if (window && record.timestamp) {

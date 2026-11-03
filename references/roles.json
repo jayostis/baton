@@ -25,10 +25,10 @@
   "handoff": {
     "freshSessionTokens": 60000,
     "minimumUnitsSaved": 2500000,
-    "note": "ledger.mjs --self --waves <file>, at a wave boundary only: the orchestrator's last context minus a fresh session's, times the last wave's turns, as cache reads. A fresh or compacted orchestrator started at 47-69k in session 28675dc0. There, at wave 7's opening (194k), a handoff would have saved 40.4M re-read tokens over the next 302 turns, 4.0M units; at wave 6's close (216k after 95 turns) 1.5M. The threshold, a quarter of a percent of the week, hands off at the first and not the second."
+    "note": "ledger.mjs --self --waves <file>, at a wave boundary only: the orchestrator's last context minus a fresh session's, times the last wave's turns, as cache reads. A fresh or compacted orchestrator started at 47-69k in session 28675dc0. There, at wave 7's opening (194k), a handoff would have saved 40.4M re-read tokens over the next 302 turns, 4.0M units; at wave 6's close (216k after 95 turns) 1.5M. The threshold, a quarter of a percent of the week, hands off at the first and not the second. Each decision is logged in run.md as the handoff-decision line that --self prints; the retro reads them back with ledger.mjs --handoffs <run.md> --next <the next session-dir> and recalibrates freshSessionTokens and minimumUnitsSaved."
   },
   "waveBudgetUnits": null,
-  "unitTargetNote": "Yardsticks, not caps: no agent can see its own usage, so a target changes nothing while the agent runs. The ledger flags an agent past its target for the retro to explain. Set 2026-11-03 near the 90th percentile of each role over this epic's sessions 837ef843 and 28675dc0, in the new units (builder: 29 agents, median 1.9M, p90 5.5M; fix: 56, median 0.31M, p90 0.64M; review-new-logic: 23, p90 1.8M; review-small: 28, p90 0.29M; critical read: 4, max 2.6M). What crossed them were Opus builders and steps that spanned repos. Walk had no data and was converted at the Sonnet ratio (0.6). Mechanical and orchestrator are kept: one mechanical ran (0.13M), and the orchestrator of 28675dc0 came to 31.7M, about 4M of it from the handoff missed at wave 7.",
+  "unitTargetNote": "Yardsticks, not caps: no agent can see its own usage, so a target changes nothing while the agent runs. The ledger flags an agent past its target for the retro to explain. Set 2026-11-03 near the 90th percentile of each role over this epic's sessions 837ef843 and 28675dc0, in the new units (builder: 29 agents, median 1.9M, p90 5.5M, and by model: sonnet 17 agents, median 1.3M, p90 4.0M, max 4.1M; opus 10 agents, median 5.2M, p90 6.0M, max 8.2M; 2 fable; fix: 56, median 0.31M, p90 0.64M; review-new-logic: 23, p90 1.8M; review-small: 28, p90 0.29M; critical read: 4, max 2.6M). The builder carries one target per model, since an Opus builder runs at twice the units for the same work: unitTarget is the default model's (sonnet, the epic-wide p90) and unitTargetByModel names the others (opus: its own p90, from ten agents, so the ninth-largest value; treat it as a pointer until a later epic adds to the sample); the ledger warns against the target of the model that ran. What crossed the single target were Opus builders and steps that spanned repos. Walk had no data and was converted at the Sonnet ratio (0.6). Mechanical and orchestrator are kept: one mechanical ran (0.13M), and the orchestrator of 28675dc0 came to 31.7M, about 4M of it from the handoff missed at wave 7.",
   "roles": {
     "critical-read": {
       "model": "opus",
@@ -40,6 +40,7 @@
       "model": "sonnet",
       "effort": "high",
       "unitTarget": 5500000,
+      "unitTargetByModel": { "opus": 6000000 },
       "brief": "builder.md",
       "note": "opus only where the critical read names the step design-heavy"
     },

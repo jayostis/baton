@@ -37,7 +37,7 @@ want a design call get Opus; nothing else does.
 
 **Waves.** Three to four agents at once; one at a time for anything that takes the Docker lock or times a run. Before
 a wave starts, add it to `waves.json` (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when
-its last PR merges. `budgetUnits` and the role table's `unitTarget` are both cost units, so
+its last PR merges. `budgetUnits` and the role table's `unitTarget` (or `unitTargetByModel` for the model that runs) are both cost units, so
 the first budget is the sum of the wave's agents' targets, and later ones
 come from the ledger.
 
@@ -104,7 +104,7 @@ compaction resets it, the peak never) and whether a fresh session, over as many 
 least `handoff.minimumUnitsSaved` in `roles.json`. On yes: stop dispatching, write `HANDOFF.md` (wave state with merge
 commits, what is waiting on the maintainer, tool paths, stale locks, agents in flight), push whatever is unpushed, and
 tell the maintainer to start a fresh session with `/baton:epic resume <epic>`. On no, carry on and say nothing about
-it. Never judge your context from memory or a compaction summary: they carry the number from before the compaction.
+it. Either way, paste the `handoff-decision` line it prints into `run.md` as one line, so the retro can read it back. Never judge your context from memory or a compaction summary: they carry the number from before the compaction.
 
 ## Retro
 

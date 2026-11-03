@@ -10,10 +10,15 @@ export function loadRoles(path = ROLES_PATH) {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
+// The model family a model id belongs to, by the keys of the weight table: 'opus', 'sonnet', ... or 'unknown'.
+export function familyOf(model, roles = loadRoles()) {
+  return Object.keys(roles.weights.models).find((m) => m !== 'unknown' && String(model).includes(m)) || 'unknown'
+}
+
 // Cost units of one agent's token counts: each kind's tokens times its weight, times the model's.
 export function units(tokens, model, roles = loadRoles()) {
   const { kinds, models } = roles.weights
-  const family = Object.keys(models).find((m) => m !== 'unknown' && String(model).includes(m)) || 'unknown'
+  const family = familyOf(model, roles)
   const base = (tokens.input || 0) * kinds.input + (tokens.cacheWrite || 0) * kinds.cacheWrite +
     (tokens.cacheRead || 0) * kinds.cacheRead + (tokens.output || 0) * kinds.output
   return Math.round(base * models[family])
