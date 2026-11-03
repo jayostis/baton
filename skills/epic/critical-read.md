@@ -18,6 +18,8 @@ issues, the settled list and the `[critical-read]` and `[all]` lines of `referen
 - **Local loop.** Is there a fast way to run each step's checks before the first build: an image, a host runner, a
   harness? If not, that is step 0.
 - **Cost.** Which steps are design-heavy (Opus) and which are mechanical (Haiku)? Everything else is Sonnet.
+- **One repo per build.** A step that changes several repos becomes one build per repo, producer first, each its own
+  row in your table.
 
 ## Return
 

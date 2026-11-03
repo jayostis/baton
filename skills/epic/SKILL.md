@@ -37,7 +37,7 @@ want a design call get Opus; nothing else does.
 
 **Waves.** Three to four agents at once; one at a time for anything that takes the Docker lock or times a run. Before
 a wave starts, add it to `waves.json` (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when
-its last PR merges. `budgetUnits` and the role table's `unitTarget` are both cost units, so
+its last PR merges. `budgetUnits` and the role table's `unitTarget` (or `unitTargetByModel` for the model that runs) are both cost units, so
 the first budget is the sum of the wave's agents' targets, and later ones
 come from the ledger.
 
@@ -66,12 +66,15 @@ a log excerpt, never to the builder.
 you, logged. Related PRs may share one reviewer. A reviewer is told, in the prompt, the PR, the red log, the local runs
 and the partner heads, so it does not rediscover them.
 
-**Fix.** A fresh `fix` agent, brief `fix.md`, given the findings file and the branch, not the history. More than ten
-findings: split into two agents. It posts one PR comment and pushes. Never `/baton:pr loop` in an epic.
+**Fix.** A fresh `fix` agent, brief `fix.md`, given the findings file and the branch, not the history. The findings
+file quotes the reviewer's items and any ruling they touch word for word, and names the targeted test command from the
+project config. More than ten findings: split into two agents. It posts one PR comment and pushes. A CI red on a
+branch whose fixer is still running goes to that fixer by `SendMessage`. Never `/baton:pr loop` in an epic.
 
 **Merge.** Only through the project's `gate`, only after the maintainer has said in chat that you may, with the date
 recorded in `HANDOFF.md`. The gate reads state itself (mergeability, checks on the current head, threads, a review for
-this head); a report from an agent is never the gate. No `--admin`. Pairs merge back to back.
+this head); a report from an agent is never the gate. No `--admin`. Pairs merge back to back. After each merge, start
+`wait_ci` on the base branch's new head in the background; a red main is the next fix.
 
 **Walk.** When the last PR is merged, the `walk` role, `walk.md`, drives what shipped. Its findings become issues;
 count them for the retro.
@@ -95,11 +98,13 @@ standing rulings issue, with your lean, batched. Do not wait on an answer you ca
 
 ## Your own context
 
-You are the most expensive agent in the run and you are re-read every turn. At each wave boundary run
-`ledger.mjs --self`; when your own last context is past `ceilingTokens` in `roles.json`, stop dispatching, write
-`HANDOFF.md` (wave state with merge commits, what is waiting on the maintainer, tool paths, stale locks, agents in
-flight), push whatever is unpushed, and tell the maintainer to start a fresh session with `/baton:epic resume <epic>`.
-Do not compact and carry on.
+You are the most expensive agent in the run: every turn re-reads your whole context. At each wave boundary, and only
+there, run `ledger.mjs --self --waves <epic>/waves.json`. It prints your last context (what the next turn re-reads; a
+compaction resets it, the peak never) and whether a fresh session, over as many turns as the last wave, would save at
+least `handoff.minimumUnitsSaved` in `roles.json`. On yes: stop dispatching, write `HANDOFF.md` (wave state with merge
+commits, what is waiting on the maintainer, tool paths, stale locks, agents in flight), push whatever is unpushed, and
+tell the maintainer to start a fresh session with `/baton:epic resume <epic>`. On no, carry on and say nothing about
+it. Either way, paste the `handoff-decision` line it prints into `run.md` as one line, so the retro can read it back. Never judge your context from memory or a compaction summary: they carry the number from before the compaction.
 
 ## Retro
 

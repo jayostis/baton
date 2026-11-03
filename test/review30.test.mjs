@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, basename } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { isFinished, summarize } from '../scripts/lib/transcript.mjs'
@@ -175,7 +175,7 @@ test('S8: the SubagentStop hook appends the agent ledger row to the run log and 
   const stop = (input, env = {}) => spawnSync(process.execPath, [script('ledger-hook.mjs')], { input, encoding: 'utf8', env: { ...process.env, BATON_HOME: baton, ...env } })
   const r = stop(JSON.stringify({ session_id: 'sess', cwd: root, hook_event_name: 'SubagentStop', agent_id: 'a1', agent_type: 'general-purpose', agent_transcript_path: join(dir, 'subagents', 'agent-a1.jsonl') }))
   assert.equal(r.status, 0, r.stderr)
-  const file = join(baton, 'runs', 'baton.jsonl')
+  const file = join(baton, 'runs', `${basename(root)}.jsonl`)
   assert.ok(existsSync(file), 'no run log written')
   const rec = JSON.parse(readFileSync(file, 'utf8').trim().split('\n').at(-1))
   assert.equal(rec.tool, 'ledger')

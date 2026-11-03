@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { summarize, isFinished } from '../scripts/lib/transcript.mjs'
 import { units, show, loadRoles } from '../scripts/lib/roles.mjs'
-import { ledger, projectLedger, waveTotals, warnings, agentLine, main as ledgerMain, selfSession } from '../scripts/ledger.mjs'
+import { ledger, projectLedger, allLedger, waveTotals, warnings, agentLine, main as ledgerMain, selfSession, selfLine, parseHandoffs, handoffCheck, rolePercentiles } from '../scripts/ledger.mjs'
 import { verdict } from '../scripts/context-ceiling.mjs'
 import { verdict as modelVerdict } from '../scripts/require-model.mjs'
 
@@ -189,4 +189,125 @@ test('run as a hook, the model script exits 2 for an unnamed model and 0 for a n
   assert.equal(run({ prompt: 'x' }).status, 2)
   assert.match(run({ prompt: 'x' }).stderr, /no model named/)
   assert.equal(run({ prompt: 'x', model: 'haiku' }).status, 0)
+})
+
+const withEnv = (vars, fn) => {
+  const keep = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]))
+  for (const [k, v] of Object.entries(vars)) if (v === undefined) delete process.env[k]; else process.env[k] = v
+  try { return fn() } finally { for (const [k, v] of Object.entries(keep)) if (v === undefined) delete process.env[k]; else process.env[k] = v }
+}
+
+test('selfSession finds the session id in another project folder than the working directory', () => {
+  const home = mkdtempSync(join(tmpdir(), 'home-'))
+  const here = join(home, '.claude', 'projects', 'C--dev-x')
+  const there = join(home, '.claude', 'projects', 'C--dev-x-repo')
+  mkdirSync(here, { recursive: true })
+  mkdirSync(there, { recursive: true })
+  writeFileSync(join(here, 'newest.jsonl'), '')
+  writeFileSync(join(there, 'mine.jsonl'), '')
+  withEnv({ CLAUDE_CONFIG_DIR: undefined, CLAUDE_CODE_SESSION_ID: 'mine' }, () => {
+    assert.equal(selfSession('C:\\dev\\x', home), join(there, 'mine'))
+  })
+})
+
+test('selfLine reads the last context, not the peak, and hands off when the last wave would have saved enough', () => {
+  const project = mkdtempSync(join(tmpdir(), 'self-'))
+  const dir = join(project, 'sess')
+  const at = (m) => `2026-10-30T10:${m}:00Z`
+  writeFileSync(`${dir}.jsonl`, [
+    turn('p', 500_000, 'claude-opus-5-5', '2026-10-30T09:00:00Z'),
+    turn('a', 300_000, 'claude-opus-5-5', at('10')),
+    turn('b', 300_000, 'claude-opus-5-5', at('20')),
+    turn('c', 300_000, 'claude-opus-5-5', at('30')),
+  ].join('\n') + '\n')
+  const waves = { w0: { from: '2026-10-29T00:00:00Z', to: '2026-10-30T09:30:00Z' }, w1: { from: at('00'), to: '2026-10-30T11:00:00Z' } }
+  // (300k - 60k) x 3 turns of w1 x cache read 0.1 x opus 2 = 144k units
+  const R = (minimumUnitsSaved) => ({ ...roles, handoff: { freshSessionTokens: 60_000, minimumUnitsSaved } })
+  const yes = selfLine(dir, waves, R(144_000))
+  assert.match(yes.line, /last context 300k/)
+  assert.match(yes.line, /peak 500k/)
+  assert.match(yes.line, /Wave w1: 3 turns/)
+  assert.match(yes.line, /save 144k units/)
+  assert.equal(yes.handOff, true)
+  assert.equal(selfLine(dir, waves, R(144_001)).handOff, false)
+  const none = selfLine(dir, {}, R(1))
+  assert.equal(none.handOff, null)
+  assert.match(none.line, /--waves/)
+  assert.equal(selfLine(join(project, 'absent'), waves, R(1)), null)
+})
+
+test('allLedger reads every project folder, and with clip counts only the turns inside the window', () => {
+  const home = mkdtempSync(join(tmpdir(), 'home-'))
+  for (const [p, ts] of [['C--a', '2026-10-30T10:00:00Z'], ['C--b', '2026-10-30T12:00:00Z']]) {
+    const folder = join(home, '.claude', 'projects', p)
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(join(folder, 's.jsonl'), [turn(`${p}1`, 1000, 'claude-sonnet-5-5', ts), turn(`${p}2`, 1000, 'claude-sonnet-5-5', '2026-10-31T10:00:00Z')].join('\n') + '\n')
+  }
+  withEnv({ CLAUDE_CONFIG_DIR: undefined }, () => {
+    const rows = allLedger('2026-10-30T00:00:00Z', '2026-10-31T00:00:00Z', roles, true, home)
+    assert.equal(rows.length, 2)
+    assert.deepEqual(rows.map((r) => r.turns), [1, 1])
+    assert.deepEqual(allLedger('2026-10-30T00:00:00Z', '2026-10-31T00:00:00Z', roles, false, home).map((r) => r.turns), [2, 2])
+  })
+})
+
+test('a role can carry a unit target per model, and the ledger warns against the target of the model that ran', () => {
+  const R = { ...roles, roles: { builder: { unitTarget: 100_000, unitTargetByModel: { opus: 300_000 } } } }
+  const row = (model, units) => ({ agent: `builder: ${model}`, id: model + units, role: 'builder', model, units, peakContext: 0 })
+  const warned = (r) => warnings([r], [], 10 ** 9, R).filter((w) => /unit target/.test(w))
+  assert.equal(warned(row('sonnet-5-5', 200_000)).length, 1)
+  assert.equal(warned(row('opus-5-5', 200_000)).length, 0)
+  assert.match(warned(row('opus-5-5', 400_000))[0], /past the 300k unit target of its role builder on opus/)
+  const real = loadRoles().roles.builder
+  assert.ok(real.unitTargetByModel.opus > 0 && real.unitTarget > 0)
+})
+
+test('selfLine prints a decision line the retro can read back, and parseHandoffs reads it', () => {
+  const project = mkdtempSync(join(tmpdir(), 'self-'))
+  const dir = join(project, 'sess')
+  const at = (m) => `2026-10-30T10:${m}:00Z`
+  writeFileSync(`${dir}.jsonl`, [turn('a', 300_000, 'claude-opus-5-5', at('10')), turn('b', 300_000, 'claude-opus-5-5', at('20')), turn('c', 300_000, 'claude-opus-5-5', at('30'))].join('\n') + '\n')
+  const waves = { w1: { from: at('00'), to: '2026-10-30T11:00:00Z' } }
+  const R = (minimumUnitsSaved) => ({ ...roles, handoff: { freshSessionTokens: 60_000, minimumUnitsSaved } })
+  const log = selfLine(dir, waves, R(144_000)).log
+  assert.match(log, /^handoff-decision /)
+  assert.equal(selfLine(dir, {}, R(1)).log, null)
+  const no = selfLine(dir, waves, R(144_001)).log
+  const text = `# run\n\n- ${log}\nnoise\n- ${no}\n`
+  const [yes, nope] = parseHandoffs(text)
+  assert.deepEqual([yes.session, yes.wave, yes.lastContext, yes.turns, yes.predictedUnits, yes.handedOff], ['sess', 'w1', 300_000, 3, 144_000, true])
+  assert.equal(nope.handedOff, false)
+  assert.equal(parseHandoffs('nothing here').length, 0)
+})
+
+test('handoffCheck sets a decision against the next session: its mean context over the same number of turns', () => {
+  const project = mkdtempSync(join(tmpdir(), 'next-'))
+  const dir = join(project, 'next')
+  writeFileSync(`${dir}.jsonl`, [turn('a', 50_000, 'claude-opus-5-5'), turn('b', 70_000, 'claude-opus-5-5'), turn('c', 900_000, 'claude-opus-5-5')].join('\n') + '\n')
+  const d = { session: 'old', wave: 'w1', lastContext: 300_000, turns: 2, predictedUnits: 0, handedOff: true }
+  const R = { ...roles, handoff: { freshSessionTokens: 60_000, minimumUnitsSaved: 1 } }
+  const c = handoffCheck(d, dir, R)
+  assert.equal(c.nextTurns, 2)
+  assert.equal(c.meanContext, 60_000)
+  // what the old session would have re-read beyond the new one's mean, over the same turns: (300k - 60k) x 2, as cache reads
+  assert.equal(c.actualUnits, units({ cacheRead: 240_000 * 2 }, 'opus-5-5', R))
+  assert.equal(handoffCheck(d, join(project, 'absent'), R), null)
+})
+
+test('rolePercentiles gives the count, median and 90th percentile of each role and model, nearest rank', () => {
+  const rows = [...Array(10).keys()].map((i) => ({ role: 'builder', model: 'opus-5-5', units: (i + 1) * 100 }))
+  rows.push({ role: 'builder', model: 'sonnet-5-5', units: 50 }, { role: null, model: 'sonnet-5-5', units: 9 })
+  const p = rolePercentiles(rows, roles)
+  assert.deepEqual(p['builder opus'], { n: 10, median: 500, p90: 900, max: 1000 })
+  assert.deepEqual(p['builder sonnet'], { n: 1, median: 50, p90: 50, max: 50 })
+  assert.equal(Object.keys(p).length, 2)
+})
+
+test('summarize stops after maxTurns turns', () => {
+  const project = mkdtempSync(join(tmpdir(), 'max-'))
+  const path = join(project, 's.jsonl')
+  writeFileSync(path, [turn('a', 10), turn('b', 20), turn('c', 30)].join('\n') + '\n')
+  const s = summarize(path, { maxTurns: 2 })
+  assert.equal(s.turns, 2)
+  assert.equal(s.lastContext, 20)
 })

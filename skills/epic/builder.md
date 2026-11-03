@@ -11,7 +11,7 @@ file, 4 the plugin root, 5 the project config. Read those, the project config's 
 - **Red first.** Follow `/baton:tdd`. Extend an existing test before adding one; one fixture per behaviour; delete a
   test your change makes redundant; report the test counts before and after.
 - **Measure only what the issue says decides.** Otherwise write "none, because". Counts before wall time; three or
-  more pairs for a timing; code that scales is timed at its real size.
+  more pairs for a timing.
 - **Affected tests only**, locally. The project's `verify_command` before every push. Merge `origin/main` before
   every push, as its own commit. Commit in coherent steps and push early: only pushed work survives a stopped run.
 - **Settled is settled.** Fallout from a ruling in the step file is applied and said in one line. Decide, do not
@@ -40,7 +40,8 @@ per step.
 
 ## Context
 
-Your ceiling is 200k tokens. Near it, push, and hand back with what is left; a fresh agent continues from your note.
+You cannot see your context, and every turn re-reads all of it. Read files by range and logs by tail.
+Build one repo; if the step names another, push yours and hand back what is left for a fresh builder.
 
 ## Report
 
