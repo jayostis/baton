@@ -3,8 +3,8 @@
 # head, merge state, every check on the current head, unresolved review threads.
 #   gate.sh <owner/repo> <pr> [--merge] [--allow <check name>]...
 # Prints the verdict; with --merge, merges (merge commit) only when the gate passes. Never bypasses a BLOCKED,
-# UNKNOWN or BEHIND PR. --allow names a check (by name prefix) that may be red; use it only when the PR body names
-# the step that turns that check green. Any check not named must succeed or be skipped.
+# UNKNOWN or BEHIND PR. --allow names a check (by name prefix) that may be red; use it only for a check another repo's PR
+# turns green, which the PR body names. Any check not named must succeed or be skipped.
 set -u
 repo=${1:-}; pr=${2:-}
 if [[ "$repo" != */* || -z "$pr" ]]; then echo "usage: gate.sh <owner/repo> <pr> [--merge] [--allow <check name>]..." >&2; exit 2; fi
@@ -37,6 +37,7 @@ unallowed=$(printf '%s\n' "$bad" | while IFS=$'\t' read -r st nm; do
 done)
 threads=$(gh api graphql -f query="{repository(owner:\"$owner\",name:\"$name\"){pullRequest(number:$pr){reviewThreads(first:100){nodes{isResolved}}}}}" -q '[.data.repository.pullRequest.reviewThreads.nodes[]|select(.isResolved|not)]|length')
 echo "$repo#$pr -> $base  head $head  state $state  unresolved threads $threads"
+[ -z "$(gh pr checks "$pr" -R "$repo" --json name -q '.[]|.name')" ] && echo "no checks on head"
 [ -n "$bad" ] && { echo "checks not passing:"; printf '%s\n' "$bad"; }
 [ ${#allowed[@]} -gt 0 ] && echo "allowed red: ${allowed[*]}"
 okstate=""; [ "$state" = "CLEAN" ] && okstate=1

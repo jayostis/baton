@@ -66,7 +66,7 @@ lines. The briefs refer to its entries by these names; each is a command, a path
 
 | entry | what it is |
 |---|---|
-| `run_folders` | the folder epics' run folders live in; a bare epic name means `<run_folders>/<name>`, and without it the skill asks |
+| `run_folders` | the folder epics' run folders live in; a bare name (a name with no slash) means `<run_folders>/<name>`, and without it the skill asks |
 | `worktree`, `review_worktree` | tools that give a builder a worktree per step and a reviewer a standing one |
 | `verify_command`, `test_targeted` | the pre-push gate, and how to run only the tests a change affects |
 | `depends_on` | how PRs in different repos name each other, and the order they merge |

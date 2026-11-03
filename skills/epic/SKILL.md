@@ -1,25 +1,27 @@
 ---
 name: epic
 description: Run an epic as its orchestrator — plan, one critical read, waves of agents dispatched by a role table, a cost ledger at every handback, merge through the gate, status to the maintainer, handoff to a fresh session at your own context ceiling, then a retro that proposes changes to baton as one PR. Use when the maintainer names an epic, a folder of step issues, or says to run the plan.
-argument-hint: "<epic> | resume <epic> | retro <epic> (a name under the config's run_folders, or a path)"
+argument-hint: "<epic> | resume <epic> | retro <epic>"
 ---
 
 # /baton:epic
 
-You orchestrate. You dispatch, read, gate, merge and log. You build nothing beyond a one-line edit. Read the
-ledger, not your impression of the spend.
+You orchestrate. You dispatch, read, gate, merge and log. You build nothing beyond a one-line edit. Every cost
+decision below was learned in an epic that ignored it; read the ledger, not your impression of the spend.
 
 ## Start
 
 1. **Project config.** Read once: `${user_config.project_config}`, else `.baton/project.md` in the repo you are in.
-   Without one, ask for it and stop. It names `run_folders`, worktree tools, verify command, Depends-On pairing, standing rulings with reasons, the stop
-   line and the probe files.
-2. **Run folder** `<epic>/`: a bare epic name means `<run_folders>/<name>` from the config; a path is used as given.
-   With a bare name and no `run_folders`, ask; never guess. It holds working state only: `HANDOFF.md` (template
-   `${CLAUDE_PLUGIN_ROOT}/references/handoff.md`), `run.md`, `waves.json`, `steps/`, `notes/<step>.md`, `report.md`.
-   `resume` means read `HANDOFF.md` and continue from it; GitHub is the record, this machine a cache.
-   **Anything meant to outlive the epic** (design, research, results, decisions) is posted to the epic or step issue, or
-   published and linked there, the same turn it is written. The folder is deleted after the retro.
+   Without one, ask for it and stop. It names `run_folders`, worktree tools, verify command, Depends-On pairing,
+   rulings with reasons, the stop line and probe files.
+2. **Run folder** `<epic>/`: a name with no slash means `<run_folders>/<name>` from the config; a path is used as
+   given. Without `run_folders`, ask. Working state only: `HANDOFF.md` (template
+   `${CLAUDE_PLUGIN_ROOT}/references/handoff.md`), `run.md`, `waves.json`, `steps/`, `notes/<step>.md`. `resume` reads
+   `HANDOFF.md` and continues; GitHub is the record, this machine a cache.
+
+   Anything lasting (design, research, results, the walk and retro report) is posted to the epic or
+   step issue the same turn. The run folder is deleted after the retro PR merges.
+
 3. **Roles.** `${CLAUDE_PLUGIN_ROOT}/references/roles.json` is the table: role, model, effort, token target, brief.
    Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`. Read the table, do not restate it.
 4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which is what turns the
@@ -60,8 +62,8 @@ Builders hand back once. Nothing is sent to an agent that has handed back; a fix
 hook appends each agent's ledger row to the run log.
 
 **CI.** One blocking command, run in the background by you (or by a `mechanical` agent when it is more than one
-command), using `bash ${CLAUDE_PLUGIN_ROOT}/scripts/wait-ci.sh <owner/repo> <pr>` (or `--commit <sha>`). Nobody polls and no builder waits. Red goes to a fresh `fix` agent with
-a log excerpt, never to the builder.
+command), using `bash ${CLAUDE_PLUGIN_ROOT}/scripts/wait-ci.sh <owner/repo> <pr>`. Nobody polls; no
+builder waits. Red goes to a fresh `fix` agent with a log excerpt, never to the builder.
 
 **Review.** Every PR gets an independent reader, `reviewer.md`, read-only, returning a ranked list. New logic gets
 `review-new-logic`; a small or mechanical diff gets `review-small`; a byte-identical regeneration may be read by
@@ -73,9 +75,12 @@ file quotes the reviewer's items and any ruling they touch word for word, and na
 project config. More than ten findings: split into two agents. It posts one PR comment and pushes. A CI red on a
 branch whose fixer is still running goes to that fixer by `SendMessage`. Never `/baton:pr loop` in an epic.
 
-**Merge.** Only through `bash ${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh <owner/repo> <pr> [--merge] [--allow <check>]...`, only after the maintainer has said in chat that you may, with the date
-recorded in `HANDOFF.md`. The gate reads state itself (mergeability, checks on the current head, threads); a report from an agent is never the gate. No `--admin`. Pairs merge back to back. After each merge, start
-`wait-ci.sh` on the base branch's new head in the background; a red main is the next fix.
+**Merge.** Only through `bash ${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh <owner/repo> <pr> [--merge] [--allow <check>]...`,
+only after the maintainer has said in chat that you may, the date recorded in `HANDOFF.md`. The gate reads state
+itself (mergeability, checks on the current head, threads), never a review: before merging, confirm the PR's head is
+the one reviewed (or a fix round's push the review covered). An agent's report is never the gate. `--allow` is only
+for a check a Depends-On partner's PR turns green, which the PR body names. No `--admin`. Pairs merge back to back.
+After each merge, start `wait-ci.sh` on the base branch's new head in the background; a red main is the next fix.
 
 **Walk.** When the last PR is merged, the `walk` role, `walk.md`, drives what shipped. Its findings become issues;
 count them for the retro.
