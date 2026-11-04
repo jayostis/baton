@@ -25,4 +25,4 @@ Run it when the walk is done, in the orchestrator session, and finish with one P
    the briefs. To add a line, merge or delete one: the file has a hard cap and a test enforces it. Delete a rule whose
    reason no longer holds or that caught nothing this epic. Change a model or target only for evidence in the ledger.
 7. **Test and open.** `node --test test/*.test.mjs`. The PR body lists each change with the number behind it and ends
-   with what the maintainer must decide. The maintainer merges. After the retro PR merges, delete the run folder.
+   with what the maintainer must decide. The maintainer merges. When the epic closes, delete the run folder; a paused epic keeps it, its pause noted on the epic.
