@@ -5,7 +5,7 @@
 [all] A script exit code is the contract; exit 0 from a session proves nothing, so read the denials and the repo.
 [all] Scratch repros go under a short path in Temp; a long scratchpad path broke tests three times.
 [all] Never git stash, and never git checkout a ref in a main clone (it left one on a detached HEAD); read another ref with git show <ref>:<path>.
-[all] On Windows the Bash tool halves a doubled backslash even inside single quotes (printf '%s' 'a\\b' prints a\b): write files and backslash-heavy code with Edit and Write, never a heredoc or node -e (three fix rounds in one epic).
+[all] On Windows the Bash tool halves a doubled backslash even inside single quotes (printf '%s' 'a\\b' prints a\b), and source files may be CRLF on disk so scripted string edits miss: write files and code with Edit and Write, never a heredoc, sed or node -e (three fix rounds in one epic, three wrecked edits in the next).
 [all] Only one Docker run at a time, behind the project's lock; never remove a lock you did not take (three OOM kills, one stolen timing lock).
 [all] A background command wakes you only after your turn ends; do not start one you need before reporting.
 [orchestrator] Never resume a finished agent: five Opus builders resumed 4-9 times were 852M of 1,122M cache reads, and a fresh fix agent cost 58k against 208k for the author.
@@ -13,8 +13,11 @@
 [orchestrator] Read mergeStateStatus first (DIRTY shows no checks), and trust a checks row only once it shows the new head SHA.
 [orchestrator] After every merge, wait-ci.sh on the base branch's new head; starter-kit main sat red two days unnoticed and cost the next PR a fix round.
 [orchestrator] Merge only through the gate, never from an agent's report or with --admin, and only with merge permission stated in chat (auto mode refuses without it); record its date in HANDOFF.
-[orchestrator] Give every builder the orchestrator-owned artefacts and rulings once, up front; three mid-task updates cost two Docker runs and a CI wait.
-[orchestrator] A consumer starts early only against a seam written in the settlements, told which suites cannot go green until its producer lands; wait for review only if review may change the contract.
+[orchestrator] Give every agent the orchestrator-owned artefacts and rulings once, up front, each input by path: the run folder, the test command, the git ref of code to restore, a ready fixture copy, the key's source and a live try's cost (six handbacks in one epic asked for one of these; three mid-task updates once cost two Docker runs).
+[orchestrator] A consumer starts early only against a seam written in the settlements, in its exact shape (the parts, tool names and fields each side keeps), told which suites cannot go green until its producer lands; a seam written as "unchanged" left a reviewer's coupling check conditional.
+[orchestrator] A behaviour that rests on a live provider gets one live probe before its step closes, and its fix starts from a captured request: stubbed tests passed a chat reply that went 0 of 1 live, and two guessed causes were wrong where the capture showed a 4096-token cap eaten by thinking.
+[orchestrator] Review every fix round's diff, however small; a fix round's own change replaced a complete reply with a cut-off one, and only that round's review caught it.
+[orchestrator] The maintainer's own session with what shipped is a walk; schedule it before calling a phase done (thirty minutes found seven defects, one of them the contract failing live).
 [orchestrator] One agent per branch at a time: a second review or a CI red for a branch whose fixer is still running goes to that fixer by SendMessage.
 [orchestrator] A findings file quotes the reviewer and any ruling it touches; a paraphrase naming one of two commands (rt#589) and an "or otherwise" against a ruling (rt#576) each cost a round.
 [orchestrator] Split a very large diff's review by concern, one reviewer each.
