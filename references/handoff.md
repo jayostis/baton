@@ -25,8 +25,9 @@ and `run.md`, so write what it cannot get from GitHub.
 - <decision, lean, reason>
 
 ## Machine
-- Session dir for the ledger: <path>   Epic folder: <path>
+- Session dir for the ledger: <path>   Run folder: <path>
 - Locks held or stale: <names, owner pid, age>
+- Lasting work (design, research, results) is on its issue or at a linked artifact, not only here: <links>
 - Unpushed work: <repo, branch, or none>   Tool paths: <from the project config, only what changed>
 
 ## Next

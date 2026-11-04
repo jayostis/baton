@@ -11,7 +11,7 @@
 [orchestrator] Never resume a finished agent: five Opus builders resumed 4-9 times were 852M of 1,122M cache reads, and a fresh fix agent cost 58k against 208k for the author.
 [orchestrator] Polling CI burned a third of a week; one blocking command, full 40-character SHA, started once.
 [orchestrator] Read mergeStateStatus first (DIRTY shows no checks), and trust a checks row only once it shows the new head SHA.
-[orchestrator] After every merge, wait_ci on the base branch's new head; starter-kit main sat red two days unnoticed and cost the next PR a fix round.
+[orchestrator] After every merge, wait-ci.sh on the base branch's new head; starter-kit main sat red two days unnoticed and cost the next PR a fix round.
 [orchestrator] Merge only through the gate, never from an agent's report or with --admin, and only with merge permission stated in chat (auto mode refuses without it); record its date in HANDOFF.
 [orchestrator] Give every builder the orchestrator-owned artefacts and rulings once, up front; three mid-task updates cost two Docker runs and a CI wait.
 [orchestrator] A consumer starts early only against a seam written in the settlements, told which suites cannot go green until its producer lands; wait for review only if review may change the contract.
