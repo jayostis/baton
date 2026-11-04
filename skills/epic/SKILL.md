@@ -19,8 +19,8 @@ decision below was learned in an epic that ignored it; read the ledger, not your
    `${CLAUDE_PLUGIN_ROOT}/references/handoff.md`), `run.md`, `waves.json`, `steps/`, `notes/<step>.md`. `resume` reads
    `HANDOFF.md` and continues; GitHub is the record, this machine a cache.
 
-   Anything lasting (design, research, results, the walk and retro report) is posted to the epic or
-   step issue the same turn. The run folder is deleted after the retro PR merges.
+   Anything lasting (design, research, results, reviews, decisions, the walk and retro report) goes on GitHub
+   the same turn. Delete the run folder when the epic closes; a paused epic keeps it.
 
 3. **Roles.** `${CLAUDE_PLUGIN_ROOT}/references/roles.json` is the table: role, model, effort, token target, brief.
    Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`. Read the table, do not restate it.
