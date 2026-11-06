@@ -67,8 +67,8 @@ builder waits. Red goes to a fresh `fix` agent with a log excerpt, never to the 
 
 **Review.** Every PR gets an independent reader, `reviewer.md`, read-only, returning a ranked list. New logic gets
 `review-new-logic`; a small or mechanical diff gets `review-small`; a byte-identical regeneration may be read by
-you, logged. Related PRs may share one reviewer. A reviewer is told, in the prompt, the PR, the red log, the local runs
-and the partner heads, so it does not rediscover them.
+you, logged. Related PRs may share one reviewer. A reviewer's prompt names the PR, its review slot, the red log, the
+local runs and the partner heads, so it does not rediscover them.
 
 **Fix.** A fresh `fix` agent, brief `fix.md`, given the findings file and the branch, not the history. The findings
 file quotes the reviewer's items and any ruling they touch word for word, and names the targeted test command from the
