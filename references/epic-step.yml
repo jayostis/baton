@@ -27,7 +27,7 @@ body:
     id: files
     attributes:
       label: Files
-      description: By path and symbol, never by line number. Which repo each lives in.
+      description: By path and symbol, never by line number. Which repo each lives in, and every reader of what changes in any repo (saved output, tests that pin it, adapters).
   - type: textarea
     id: settled
     attributes:

@@ -7,11 +7,11 @@
 [all] Never git stash, and never git checkout a ref in a main clone (it left one on a detached HEAD); read another ref with git show <ref>:<path>.
 [all] On Windows the Bash tool halves a doubled backslash even inside single quotes (printf '%s' 'a\\b' prints a\b), and source files may be CRLF on disk so scripted string edits miss: write files and code with Edit and Write, never a heredoc, sed or node -e (three fix rounds in one epic, three wrecked edits in the next).
 [all] Only one Docker run at a time, behind the project's lock; never remove a lock you did not take (three OOM kills, one stolen timing lock).
-[all] A background command wakes you only after your turn ends; do not start one you need before reporting.
+[all] A background command wakes you only after your turn ends; do not start one you need before reporting, and stop every one you started before handing back (a builder re-sent its handback three times at 470k context as its runs ended).
 [orchestrator] Never resume a finished agent: five Opus builders resumed 4-9 times were 852M of 1,122M cache reads, and a fresh fix agent cost 58k against 208k for the author.
 [orchestrator] Polling CI burned a third of a week; one blocking command, full 40-character SHA, started once.
 [orchestrator] Read mergeStateStatus first (DIRTY shows no checks), and trust a checks row only once it shows the new head SHA.
-[orchestrator] After every merge, wait-ci.sh on the base branch's new head; starter-kit main sat red two days unnoticed and cost the next PR a fix round.
+[orchestrator] After every merge, wait-ci.sh on the base branch's new head, and on the main of every repo that runs the merged code (an adapter's Bridge); starter-kit main sat red two days unnoticed and cost the next PR a fix round, and bridge-rs main sat red two days after adapter merges and cost about 9M units.
 [orchestrator] Merge only through the gate, never from an agent's report or with --admin, and only with merge permission stated in chat (auto mode refuses without it); record its date in HANDOFF.
 [orchestrator] Give every agent the orchestrator-owned artefacts and rulings once, up front, each input by path: the run folder, the test command, the git ref of code to restore, a ready fixture copy, the key's source and a live try's cost (six handbacks in one epic asked for one of these; three mid-task updates once cost two Docker runs).
 [orchestrator] A consumer starts early only against a seam written in the settlements, in its exact shape (the parts, tool names and fields each side keeps), told which suites cannot go green until its producer lands; a seam written as "unchanged" left a reviewer's coupling check conditional.
@@ -19,7 +19,8 @@
 [orchestrator] Every fix round's diff gets a review-small (about 0.1M units); the orchestrator may read one of a few source lines itself, logged. A fix round's own change replaced a complete reply with a cut-off one, and only that round's review caught it.
 [orchestrator] The maintainer's own session with what shipped is a walk; schedule it before calling a phase done (thirty minutes found seven defects, one of them the contract failing live).
 [orchestrator] One agent per branch at a time: a second review or a CI red for a branch whose fixer is still running goes to that fixer by SendMessage.
-[orchestrator] A findings file quotes the reviewer and any ruling it touches; a paraphrase naming one of two commands (rt#589) and an "or otherwise" against a ruling (rt#576) each cost a round.
+[orchestrator] A findings file quotes the reviewer and any ruling it touches, and names the targeted test command as the repo really runs it; a paraphrase naming one of two commands (rt#589) and an "or otherwise" against a ruling (rt#576) each cost a round, and three fix agents in one epic were handed the wrong runner or the full suite.
+[orchestrator] A handoff logged yes ends the session: tell the maintainer and dispatch nothing more, and the next session's id in run.md is the witness; three yes decisions in one epic were each followed by more turns in the same transcript, which reached 716 turns, a 428k peak and 22.7M units.
 [orchestrator] Split a very large diff's review by concern, one reviewer each.
 [orchestrator] Reviewers found something on nearly every PR; skipping one is logged in the status line, never silent.
 [orchestrator] Name the code path that shows a behaviour before dispatching its fix; a lean has assumed what the engine could not do.
@@ -33,7 +34,7 @@
 [critical-read] Reading all steps together found 15 must-fixes in one epic and must-fixes in every other; per-step grooming did not.
 [critical-read] A step that rests on an unmeasured number is a step 0: one spike cancelled a step worth 71k tokens and 4 minutes.
 [critical-read] Set up the local fast loop first; a host runner removed Docker from the loop and made each check six times faster.
-[critical-read] Before adding to a shared scheme or term, grep every reader in every repo.
+[critical-read] Each step names every reader of what it changes, in every repo: saved kit output, tests that pin the old value, every adapter that carries it; five handbacks in one epic found a reader missing, and one missed test turned a main red.
 [critical-read] Read the reference implementation before ruling what a field means.
 [critical-read] Give a step that changes several repos one builder per repo, producer first; two such steps' single builders each stopped with one repo done, after 5.2M and 5.3M units.
 [builder] A test that was never red proves nothing; four vacuous tests were found only by running them on the old code.
@@ -50,6 +51,7 @@
 [reviewer] Where the PR's claim is a count, independently recompute it from the primary files; three such recomputations found gaps.
 [reviewer] A PR that hands a change list downstream proves it by applying the list in a scratch worktree.
 [reviewer] A pin bump is checked against the registry's publish date, at least 14 days old.
+[reviewer] A GitHub workflow step with `shell: bash` runs `bash -e`, so a command that may exit non-zero needs `|| true`; a review that assumed otherwise passed a step that turned main red.
 [fix] A fix agent that was handed ten or fewer findings and no history got every one right; more than ten overran.
 [fix] Reply to a thread after fixing, resolve only after the push; a resolution is a claim the fix is on the head.
 [fix] Run verify_command before committing; resetting a pushed commit needs a force push, which is denied.
