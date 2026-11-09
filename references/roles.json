@@ -42,7 +42,7 @@
       "unitTarget": 2200000,
       "unitTargetByModel": { "opus": 3500000 },
       "brief": "builder.md",
-      "note": "opus only where the critical read names the step design-heavy"
+      "note": "opus only where the critical read names the step design-heavy; haiku only where it names the step one simple edit repeated across many files, and that step's reviewer compares each file against the text it replaced (epic-find-your-way: nine README blocks, 0.25M units against a 0.96M sonnet median, 4 of 9 lost existing text and the review caught all 4)"
     },
     "review-new-logic": {
       "model": "opus",
