@@ -12,8 +12,7 @@ decision below was learned in an epic that ignored it; read the ledger, not your
 ## Start
 
 1. **Project config.** Read once: `${user_config.project_config}`, else `.baton/project.md` in the repo you are in.
-   Without one, ask for it and stop. It names `run_folders`, worktree tools, verify command, Depends-On pairing,
-   rulings with reasons, the stop line and probe files.
+   Without one, ask for it and stop.
 2. **Run folder** `<epic>/`: a name with no slash means `<run_folders>/<name>` from the config; a path is used as
    given. Without `run_folders`, ask. Working state only: `HANDOFF.md` (template
    `${CLAUDE_PLUGIN_ROOT}/references/handoff.md`), `run.md`, `waves.json`, `steps/`, `notes/<step>.md`. `resume` reads
@@ -22,9 +21,10 @@ decision below was learned in an epic that ignored it; read the ledger, not your
    Anything lasting (design, research, results, decisions, reports) goes on GitHub the same turn. Delete the run folder when the epic closes; a paused epic keeps it.
 
 3. **Roles.** `${CLAUDE_PLUGIN_ROOT}/references/roles.json` is the table: role, model, effort, token target, brief.
-   Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`. Read the table, do not restate it.
-4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which is what turns the
-   model rule on; `off` when the retro is done.5. **Lessons.** `${CLAUDE_PLUGIN_ROOT}/references/lessons.md`, tagged by role. Read the `[orchestrator]` and `[all]`
+   Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`.
+4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which turns on the model,
+   dispatch and machine hooks; `off` when the retro is done.
+5. **Lessons.** `${CLAUDE_PLUGIN_ROOT}/references/lessons.md`, tagged by role. Read the `[orchestrator]` and `[all]`
    lines now; each brief names the tag its agent reads.
 
 ## The loop
@@ -37,9 +37,14 @@ said in one line, never raised again.
 together against the code. Apply its must-fixes to the issues. It also assigns each step a role and a wave. Steps that
 want a design call get Opus; nothing else does.
 
-**Waves.** Three to four agents at once; one at a time for anything that takes the Docker lock or times a run. Before
-a wave starts, add it to `waves.json` (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when
-its last PR merges. `budgetUnits` is cost units: the sum of the wave's agents' role targets at first, then from the ledger.
+**Waves.** Agents at once are capped by weight, heavy (builders, fixers) and light (readers, reviewers), from the
+project config's `machine` section else this machine; `node ${CLAUDE_PLUGIN_ROOT}/scripts/machine.mjs` prints the caps, and
+the dispatch hook refuses past them: wait for a handback. Every local build or test runs through
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/heavy.sh <command>`, which the Bash hook enforces, on the changed files only; the full
+suite, random-order seeds and coverage run in CI, which is free compute beside this machine. One at a time for anything
+that takes the Docker lock or times a run. Before a wave starts, add it to `waves.json`
+(`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when its last PR merges. `budgetUnits` is cost
+units: the sum of the wave's agents' role targets at first, then from the ledger.
 
 **Dispatch.** Every general-purpose `Agent` call names `model` and `effort` from the role table, and starts its
 `description` with the role key and the step key (`fix: w3 s07b round 2`), which is how the ledger knows the role and
@@ -52,7 +57,7 @@ green yet), once, up front. Before dispatching a fix, name the code path that sh
 
 **Handback.** The agent ends with the block in `${CLAUDE_PLUGIN_ROOT}/references/handback.md`. Run
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs <session-dir> --agent <id>`, paste its line above the block in
-`run.md`, and sharpen (below). A report is model output: check the repo.
+`run.md`, and sharpen (below).
 Nothing is sent to an agent that has handed back; a fix round is a fresh agent. The
 `SendMessage` hook enforces that; a message to a running agent always passes, so a stop reaches it.
 
@@ -99,17 +104,16 @@ standing rulings issue, with your lean, batched. Do not wait on an answer you ca
 
 ## Cost
 
-- Run `ledger.mjs <session-dir> --waves <epic>/waves.json --strict` at the end of each wave and whenever a
-  status is due. It warns on an agent past the context ceiling or its role's target, and a wave past its budget.
+- Run `ledger.mjs <session-dir> --waves <epic>/waves.json --strict` at each wave's end and when a
+  status is due. It warns on an agent past the context ceiling or its target, and a wave past its budget.
 - Status to the maintainer, at wave boundaries and whenever a budget is exceeded, not every message: what merged
   (issue titles with links), what is waiting on them, reviews and skips named, the decisions made without them, and a
-  usage line from the ledger (units, or a percent of the week once `roles.json` has a calibration).
+  usage line from the ledger.
 
 ## Your own context
 
 You are the most expensive agent in the run: every turn re-reads your whole context. At each wave boundary, and only
-there, run `ledger.mjs --self --waves <epic>/waves.json`. It prints your last context and whether a fresh session, over as many turns as the last wave, would save at
-least `handoff.minimumUnitsSaved` in `roles.json`. On yes: stop dispatching, write `HANDOFF.md`, push whatever is unpushed, and
+there, run `ledger.mjs --self --waves <epic>/waves.json`. It prints your last context and whether a fresh session would save at least `handoff.minimumUnitsSaved`. On yes: stop dispatching, write `HANDOFF.md`, push whatever is unpushed, and
 tell the maintainer to start a fresh session with `/baton:epic resume <epic>`. On no, carry on. Either way, paste the
 `handoff-decision` line it prints into `run.md`. Never judge your context from memory or a compaction summary.
 
@@ -121,4 +125,3 @@ When the walk is done, `retro.md`: one PR to baton, which the maintainer merges.
 
 - A rule with a script check is the script. Call `scripts/`, never paraphrase a flag list.
 - The repo is the witness: `git log origin/<branch>`, the PR's checks on its head SHA, the threads.
-- Never `/baton:pr loop`; never resume a finished agent; never name a model by omission.

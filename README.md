@@ -75,6 +75,7 @@ lines. The briefs refer to its entries by these names; each is a command, a path
 | `traps` | a folder of dated entries, each with the test that proves it, loaded by grep on a topic, never pasted |
 | `probes` | per-repository probe lists for reviewers |
 | `locks` | the lock primitive for Docker and timed runs |
+| `machine` | a `## machine` section of `key: value` lines: `heavy_slots`, `heavy_agents`, `light_agents`, `heavy_commands` (comma-separated patterns); each optional, defaulted from the machine's cpus and memory |
 
 A project's own file lives in that project, never here.
 
@@ -102,6 +103,18 @@ A project's own file lives in that project, never here.
   epic only (`scripts/epic-mode.mjs on`, or `BATON_EPIC=1`), a general-purpose `Agent` call without a model is refused;
   agent types with their own definition, forks and baton's agents are never. `SubagentStop` appends the agent's ledger
   row to the run log. `BATON_CONTEXT_CEILING` and `BATON_REQUIRE_MODEL=0` adjust them.
+- **The machine's limits**, in an epic only: an agent costs the machine what it runs, not by the head. Each role in
+  `references/roles.json` is `local` heavy (builders, fixers, mechanical: they run tests and builds) or light (readers,
+  reviewers; `defaultLocal` names the description keys the table lacks). `scripts/agent-slots.mjs` refuses an `Agent`
+  call that would pass `heavy_agents` or `light_agents`, keeping the running agents in a file in the session's folder:
+  recorded at dispatch (a dispatch cannot know its agent's id), bound to the id by the `PostToolUse` result, removed at
+  `SubagentStop`, dropped after 90 minutes without a transcript write or 6 hours, and cleared by `SessionStart` on a
+  start or resume (a restart kills every agent in flight). `scripts/heavy-command.mjs` refuses, on `Bash` and
+  `PowerShell`, a test runner or build not run through `scripts/heavy.sh <command>`, a semaphore of `heavy_slots`
+  folders under the temp directory that reclaims a dead owner's slot and sizes pytest-xdist's `-n auto` to its share of
+  the cpus; the refusal gives the command to run. Claude Code runs `PreToolUse` hooks for a subagent's tool calls too, so
+  this covers builders. `node scripts/machine.mjs` prints the limits. `BATON_MACHINE=0` turns both hooks off and
+  `heavy.sh` into a plain exec.
 - **Lessons**, `references/lessons.md`: one-line rules tagged by role, capped at 80 lines by a test.
 - **Retro**, `skills/epic/retro.md`: runs the ledger, compares with the project's `epics.csv`, reads the handback blocks and
   opens one PR to this repository. The maintainer merges it; nothing updates itself. `scripts/history.mjs` builds
