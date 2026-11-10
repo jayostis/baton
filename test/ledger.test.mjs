@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { summarize } from '../scripts/lib/transcript.mjs'
-import { ledger } from '../scripts/ledger.mjs'
+import { ledger, pace, stepOf } from '../scripts/ledger.mjs'
 import { verdict } from '../scripts/context-ceiling.mjs'
 
 const turn = (id, context, model = 'claude-sonnet-5-5', ts = '2026-10-30T10:00:00Z') =>
@@ -63,4 +63,32 @@ test('the ceiling lets through an agent under it, and anything it cannot resolve
     assert.equal(verdict({ tool_name: 'SendMessage', transcript_path: transcript, tool_input: { to, message: 'x' } }, 200000).block, false)
   }
   assert.equal(verdict({ tool_name: 'Agent', transcript_path: transcript, tool_input: {} }, 200000).block, false)
+})
+
+test('--pace counts a step\'s rounds and wall-clock minutes, and flags two rounds and a slow builder', () => {
+  const { dir } = session([
+    ['b1', [turn('a', 1000, undefined, '2026-11-10T10:00:00Z'), turn('b', 1000, undefined, '2026-11-10T10:10:00Z')], { description: 'builder: w3 s07b one' }],
+    ['b2', [turn('c', 1000, undefined, '2026-11-10T10:00:00Z'), turn('d', 1000, undefined, '2026-11-10T10:12:00Z')], { description: 'builder: w3 s08 two' }],
+    ['b3', [turn('e', 1000, undefined, '2026-11-10T10:00:00Z'), turn('f', 1000, undefined, '2026-11-10T10:50:00Z')], { description: 'builder: w3 s09 three' }],
+    ['c1', [turn('g', 1000, undefined, '2026-11-10T10:20:00Z')], { description: 'cold-read: w3 s07b first' }],
+    ['f1', [turn('h', 1000, undefined, '2026-11-10T10:25:00Z')], { description: 'fix: w3 s07b round 1' }],
+    ['c2', [turn('i', 1000, undefined, '2026-11-10T10:30:00Z')], { description: 'cold-read: w3 s07b second' }],
+    ['f2', [turn('j', 1000, undefined, '2026-11-10T10:40:00Z')], { description: 'fix: w3 s07b round 2' }],
+  ])
+  const p = pace(ledger(dir))
+  const by = Object.fromEntries(p.steps.map((s) => [s.step, s]))
+  assert.deepEqual(by['w3 s07b'], { step: 'w3 s07b', rounds: 3, minutes: 40 })
+  assert.equal(by['w3 s08'].rounds, 0)
+  assert.equal(by['w3 s09'].minutes, 50)
+  assert.equal(p.steps.length, 3)
+  assert.equal(p.flags.length, 2)
+  assert.match(p.flags[0], /^w3 s07b: 3 rounds/)
+  assert.match(p.flags[1], /builder: w3 s09 three .*50 min, past twice the builder median of 12/)
+})
+
+test('a step is named by its wave and its step id or PR number, and an agent that names none has none', () => {
+  assert.equal(stepOf('fix: w0 #641 review round'), 'w0 #641')
+  assert.equal(stepOf('review-small: W1 S00 #665 fix round'), 'w1 s00')
+  assert.equal(stepOf('mechanical: w0 pin runtime'), null)
+  assert.equal(stepOf('orchestrator'), null)
 })

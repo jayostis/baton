@@ -92,7 +92,7 @@ A project's own file lives in that project, never here.
 - **Ledger**, `scripts/ledger.mjs`: reads the session transcripts, so it costs no tokens and needs no token. Per agent: turns,
   peak context, cache read and write, output, minutes, and **cost units**. Slices with `--since`, `--until`, `--wave`;
   totals per wave against a budget in `waves.json`; `--agent <id>` prints the line for a handback; `--self --waves <file>`
-  prints the orchestrator's last context, whether to hand off at this wave boundary, and the `handoff-decision` line for `run.md`; `--handoffs <run.md> --next <session-dir>` reads those lines back against the next session; `--percentiles` gives each role's p90 by model; `--all --clip` reads every
+  prints the orchestrator's last context, whether to hand off at this wave boundary, and the `handoff-decision` line for `run.md`; `--handoffs <run.md> --next <session-dir>` reads those lines back against the next session; `--percentiles` gives each role's p90 by model; `--pace` gives rounds and minutes per step (the step id in an agent's description) and flags two rounds or a builder past twice the builders' median, which the orchestrator reads at every handback; `--all --clip` reads every
   session on the machine inside a window, for calibration; `--strict` exits 1 on an agent past the ceiling or a wave over budget.
 - **Cost units** weight each token kind and each model; the weights in `roles.json` are list-price ratios, checked
   against the meter's dollars. The calibration from units to a percent of the week comes from the maintainer's usage

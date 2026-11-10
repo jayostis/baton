@@ -11,7 +11,8 @@
 //   node ledger.mjs ... --clip                                                count only turns inside --since/--until
 //   node ledger.mjs ... --percentiles                                         count, median, p90 and max of units per role and model
 //   node ledger.mjs --handoffs <run.md> [--next <session-dir>]               the handoff decisions logged in run.md; with --next, the first yes against that session
-//   node ledger.mjs ... --strict                                              exit 1 on a warning
+//   node ledger.mjs ... --pace                                                per step: rounds and minutes; flags 2+ rounds and a builder past twice the builders' median
+//   node ledger.mjs ... --strict                                             exit 1 on a warning
 //
 // --self finds this session by CLAUDE_CODE_SESSION_ID in every project folder, so it works from any directory; with no
 // id it falls back to the newest transcript in this directory's project folder. --all with --clip is how a retro
@@ -210,6 +211,36 @@ export function rolePercentiles(rows, roles = loadRoles()) {
   }))
 }
 
+// The step an agent worked, from its description ("builder: w3 s07b ...", "fix: w0 #641 review round"): the wave and the
+// step id or PR number after it. Agents whose description names none (the orchestrator, a wave-wide mechanical) have none.
+export const stepOf = (description) => /\bw\d+\s+(?:s\d+[a-z]*|#\d+)/i.exec(String(description))?.[0].toLowerCase().replace(/\s+/g, ' ') ?? null
+
+// Per step: rounds (fix agents, plus cold reads after the first), and minutes from the first dispatch to the last
+// handback. Flags a step on two rounds or more, and a builder past twice the median minutes of the builders. Read from
+// the rows the ledger already has; nothing is measured that was not.
+export function pace(rows) {
+  const word = (r) => String(r.agent).trim().split(/[\s:]/)[0].toLowerCase()
+  const steps = new Map()
+  for (const r of rows) {
+    const key = stepOf(r.agent)
+    if (!key) continue
+    const s = steps.get(key) ?? { key, fix: 0, cold: 0, start: Infinity, end: -Infinity }
+    if (word(r) === 'fix') s.fix += 1
+    if (word(r) === 'cold-read') s.cold += 1
+    s.start = Math.min(s.start, instant(r.start))
+    s.end = Math.max(s.end, instant(r.end))
+    steps.set(key, s)
+  }
+  const out = [...steps.values()].map((s) => ({ step: s.key, rounds: s.fix + Math.max(0, s.cold - 1), minutes: Number.isFinite(s.end - s.start) ? Math.round((s.end - s.start) / 60000) : null }))
+  const flags = out.filter((s) => s.rounds >= 2).map((s) => `${s.step}: ${s.rounds} rounds, a tool or brief gap to build before the next agent of that role`)
+  const builders = rows.filter((r) => word(r) === 'builder' && r.minutes != null).sort((a, b) => a.minutes - b.minutes)
+  if (builders.length) {
+    const median = builders[Math.min(builders.length - 1, Math.ceil(builders.length / 2) - 1)].minutes
+    for (const b of builders) if (b.minutes > 2 * median) flags.push(`${b.agent} (${b.id}): ${b.minutes} min, past twice the builder median of ${median}`)
+  }
+  return { steps: out, flags }
+}
+
 export function inWave(row, wave) {
   return instant(row.start) >= instant(wave.from) && (!wave.to || instant(row.start) < instant(wave.to))
 }
@@ -319,6 +350,13 @@ export function main(args) {
       return 2
     }
     console.log(line)
+    return 0
+  }
+  if (args.includes('--pace')) {
+    const p = pace(rows)
+    for (const s of p.steps.sort((a, b) => b.rounds - a.rounds || (b.minutes ?? 0) - (a.minutes ?? 0))) console.log(`${s.step}: ${s.rounds} rounds, ${s.minutes ?? '?'} min`)
+    for (const f of p.flags) console.log(`slow: ${f}`)
+    if (!p.steps.length) console.error('no agent description names a step ("w3 s07b" or "w0 #641")')
     return 0
   }
   if (args.includes('--percentiles')) {
