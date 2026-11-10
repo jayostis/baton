@@ -11,8 +11,9 @@
 [orchestrator] Never resume a finished agent: five Opus builders resumed 4-9 times were 852M of 1,122M cache reads, and a fresh fix agent cost 58k against 208k for the author.
 [orchestrator] Polling CI burned a third of a week; one blocking command, full 40-character SHA, started once.
 [orchestrator] Read mergeStateStatus first (DIRTY shows no checks), and trust a checks row only once it shows the new head SHA.
-[orchestrator] After every merge, wait-ci.sh on the base branch's new head, and on the main of every repo that runs the merged code (an adapter's Bridge); starter-kit main sat red two days unnoticed and cost the next PR a fix round, and bridge-rs main sat red two days after adapter merges and cost about 9M units.
-[orchestrator] Merge only through the gate, never from an agent's report or with --admin, and only with merge permission stated in chat (auto mode refuses without it); record its date in HANDOFF.
+[orchestrator] After every merge, wait-ci.sh on the base branch's new head, and on the main of every repo that runs the merged code (an adapter's Bridge); starter-kit main sat red two days unnoticed and cost the next PR a fix round, and bridge-rs main sat red two days after adapter merges and cost about 9M units. A main's head is `wait-ci.sh <repo> --commit <sha>`; a bare SHA is refused as "not a PR number" and waits on nothing.
+[orchestrator] Merge only through the gate, never from an agent's report or with --admin, and only with merge permission stated in chat in this session (auto mode refuses without it, and refused a merge on permission given in the session before the handoff); ask for it at resume, and record its date in HANDOFF.
+[orchestrator] Check a step file's premise about what another system emits (a test runner's output, an API field) against one real run before dispatch, and send a step that decides a policy to the critical read: "node --test prints its failing test" was false and cost a review round and three PRs, and "latest run, any event" held in a step file was the next wave's blocker.
 [orchestrator] Give every agent the orchestrator-owned artefacts and rulings once, up front, each input by path: the run folder, the test command, the git ref of code to restore, a ready fixture copy, the key's source and a live try's cost (six handbacks in one epic asked for one of these; three mid-task updates once cost two Docker runs).
 [orchestrator] A consumer starts early only against a seam written in the settlements, in its exact shape (the parts, tool names and fields each side keeps), told which suites cannot go green until its producer lands; a seam written as "unchanged" left a reviewer's coupling check conditional.
 [orchestrator] A behaviour that rests on a live provider gets one live probe before its step closes, and its fix starts from a captured request: stubbed tests passed a chat reply that went 0 of 1 live, and two guessed causes were wrong where the capture showed a 4096-token cap eaten by thinking.
@@ -34,7 +35,7 @@
 [critical-read] Reading all steps together found 15 must-fixes in one epic and must-fixes in every other; per-step grooming did not.
 [critical-read] A step that rests on an unmeasured number is a step 0: one spike cancelled a step worth 71k tokens and 4 minutes.
 [critical-read] Set up the local fast loop first; a host runner removed Docker from the loop and made each check six times faster.
-[critical-read] Each step names every reader of what it changes, in every repo: saved kit output, tests that pin the old value, every adapter that carries it; five handbacks in one epic found a reader missing, and one missed test turned a main red.
+[critical-read] Each step names every reader of what it changes, in every repo: saved kit output, tests that pin the old value, every adapter that carries it; five handbacks in one epic found a reader missing, and one missed test turned a main red. Grep a term's writers by every form it is written in (CURIE, full IRI, the constant that holds it); a CURIE-only grep missed three writers.
 [critical-read] Read the reference implementation before ruling what a field means.
 [critical-read] Give a step that changes several repos one builder per repo, producer first; two such steps' single builders each stopped with one repo done, after 5.2M and 5.3M units.
 [builder] A test that was never red proves nothing; four vacuous tests were found only by running them on the old code.
@@ -51,10 +52,10 @@
 [reviewer] Where the PR's claim is a count, independently recompute it from the primary files; three such recomputations found gaps.
 [reviewer] A PR that hands a change list downstream proves it by applying the list in a scratch worktree.
 [reviewer] A pin bump is checked against the registry's publish date, at least 14 days old.
-[reviewer] A GitHub workflow step with `shell: bash` runs `bash -e`, so a command that may exit non-zero needs `|| true`; a review that assumed otherwise passed a step that turned main red.
+[reviewer] A GitHub workflow step with `shell: bash` runs `bash -e`, so a command that may exit non-zero needs `|| true`; a review that assumed otherwise passed a step that turned main red. Under `pipefail`, a reader that stops early (`awk ... exit`, `head`) gives its writer SIGPIPE and ends the step: probe a job a PR's CI never runs (schedule or dispatch only) with a stub, as a reviewer did with 170KB of stderr.
 [fix] A fix agent that was handed ten or fewer findings and no history got every one right; more than ten overran.
 [fix] Reply to a thread after fixing, resolve only after the push; a resolution is a claim the fix is on the head.
-[fix] Run verify_command before committing; resetting a pushed commit needs a force push, which is denied.
+[fix] Run verify_command and the typecheck (`tsc -b`) before committing; a fix round's new test that was never typechecked turned a PR red, and resetting a pushed commit needs a force push, which is denied.
 [mechanical] Do not repair or retry a failed command; a half-fix pushed over a red build is worse than the red build.
 [walk] Walking the shipped thing found what tests did not in six epics, once 507 records written to the wrong destination.
 [walk] Save evidence under a path with no spaces; a space breaks the clickable link to it.
