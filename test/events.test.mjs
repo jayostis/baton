@@ -14,8 +14,6 @@ import { timeReport } from '../scripts/lib/time-report.mjs'
 import { stepOf, reasonOf, reasonFromFindings } from '../scripts/lib/steps.mjs'
 import { ledger, pace, main as ledgerMain } from '../scripts/ledger.mjs'
 import { eventOf } from '../scripts/events-hook.mjs'
-import { verdict as slots } from '../scripts/agent-slots.mjs'
-import { limits } from '../scripts/lib/machine.mjs'
 import { dispatch, render, reviewCall } from '../scripts/dispatch.mjs'
 
 const script = (name) => fileURLToPath(new URL(`../scripts/${name}`, import.meta.url)).replace(/\\/g, '/')
@@ -268,27 +266,6 @@ test('--pace counts fix rounds by reason across steps and flags a reason seen tw
   assert.deepEqual(p.reasons, { words: 2, test: 1, other: 2 })
   assert.equal(p.flags.length, 1)
   assert.match(p.flags[0], /^words: 2 fix rounds \(w1 s01, w1 s02\)/)
-})
-
-// ---- the sharpening slot
-
-const desc = (description) => ({ tool_name: 'Agent', tool_use_id: 'tu', tool_input: { description, prompt: 'x' } })
-const heavy = (at, extra = {}) => ({ id: `t${at}`, agent_id: null, description: `builder: ${at}`, weight: 'heavy', at, ...extra })
-const lim = limits({ cpuCount: 8, memBytes: 16 * 2 ** 30, env: {} })
-
-test('one sharpen agent runs past the caps and takes no place from the others; a second waits like any other', () => {
-  const full = [heavy(1), heavy(2), heavy(3)]
-  assert.equal(slots(desc('builder: w1 s09'), { epic: true, running: full, lim }).block, true)
-  const first = slots(desc('sharpen: w1 gate on changed files'), { epic: true, running: full, lim })
-  assert.equal(first.block, false)
-  assert.equal(first.entry.sharpen, true)
-  const withSharpen = [...full, first.entry]
-  const second = slots(desc('sharpen: w1 another'), { epic: true, running: withSharpen, lim })
-  assert.equal(second.block, true)
-  assert.match(second.reason, /3 heavy agents are running and the cap is 3/)
-  assert.equal(slots(desc('sharpen: w1 another'), { epic: true, running: [heavy(1), first.entry], lim }).block, false, 'with room under the cap a second is an ordinary heavy agent')
-  assert.equal(slots(desc('builder: w1 s09'), { epic: true, running: [heavy(1), heavy(2), first.entry], lim }).block, false, 'the sharpening agent does not count against the others')
-  assert.equal(slots(desc('sharpen: x'), { epic: false, running: full, lim }).block, false)
 })
 
 // ---- dispatch.mjs

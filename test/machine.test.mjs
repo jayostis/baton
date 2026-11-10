@@ -1,5 +1,5 @@
-// The machine's limits as hooks: caps on agents by weight, and heavy commands only through heavy.sh. The hooks are run as
-// the harness runs them (documented stdin, exit code, stderr); the verdict functions are called directly for the cases.
+// The machine's limits and heavy.sh, the recommended helper that holds local suites to the machine's slots. The dispatch
+// cap is in dispatch-hook.test.mjs.
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -8,9 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync, spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { limits, machineSection, weightOf, live, STALE_AGENT_MS, MAX_AGENT_MS } from '../scripts/lib/machine.mjs'
+import { limits, machineSection, weightOf } from '../scripts/lib/machine.mjs'
 import { loadRoles } from '../scripts/lib/roles.mjs'
-import { verdict as dispatch, apply, resets } from '../scripts/agent-slots.mjs'
 
 // heavy.sh and the hooks append events to the epic's log; these tests are not epics, and must not write to a real one.
 process.env.BATON_EVENTS = '0'
@@ -18,8 +17,6 @@ process.env.BATON_EVENTS = '0'
 const script = (name) => fileURLToPath(new URL(`../scripts/${name}`, import.meta.url)).replace(/\\/g, '/')
 const GB = 2 ** 30
 const lim = (o = {}) => limits({ cpuCount: 8, memBytes: 16 * GB, env: {}, ...o })
-const desc = (description) => ({ tool_name: 'Agent', tool_use_id: 'tu', tool_input: { description, prompt: 'x' } })
-const entry = (weight, at, extra = {}) => ({ id: `t${at}`, agent_id: null, description: `${weight}: x`, weight, at, ...extra })
 
 test('limits: this machine (8 cpus, 16 GB) gets 2 slots, 3 heavy agents, 10 light; fewer cpus or memory, fewer slots', () => {
   assert.deepEqual([lim().heavy_slots, lim().heavy_agents, lim().light_agents], [2, 3, 10])
@@ -35,7 +32,6 @@ test('limits: the project config wins over the defaults, the environment over bo
   assert.deepEqual(config, { heavy_slots: '3', heavy_agents: '6', light_agents: 'lots', heavy_commands: 'pytest, make test' })
   const l = lim({ config })
   assert.deepEqual([l.heavy_slots, l.heavy_agents, l.light_agents], [3, 6, 10])
-  assert.deepEqual(l.heavy_commands, ['pytest', 'make test'])
   assert.equal(lim({ config, env: { BATON_HEAVY_SLOTS: '1' } }).heavy_slots, 1)
   assert.equal(lim({ config: { heavy_slots: '0' } }).heavy_slots, 2)
 })
@@ -46,124 +42,6 @@ test('weightOf: builders, fixers and mechanical are heavy; readers, reviewers an
   for (const r of ['critical-read', 'review-new-logic', 'review-small', 'walk', 'author', 'checker', 'cold-read', 'retro', 'whatever', 'note']) assert.equal(weightOf(`${r}: w1`, roles), 'light', r)
   assert.equal(weightOf('', roles), 'light')
   for (const [role, v] of Object.entries(roles.roles)) assert.ok(['heavy', 'light'].includes(v.local), `${role} has no local weight`)
-})
-
-// ---- the dispatch cap
-
-test('dispatch: under the cap passes and records; at the cap refuses, naming the running agents of that weight only', () => {
-  const now = 10_000_000
-  const heavy = [entry('heavy', now - 60000, { description: 'builder: w1 s01' }), entry('heavy', now - 120000, { description: 'fix: w1 s02 round 2' })]
-  const under = dispatch(desc('builder: w1 s03'), { epic: true, running: heavy, lim: lim(), now })
-  assert.equal(under.block, false)
-  assert.deepEqual([under.entry.weight, under.entry.description, under.entry.id], ['heavy', 'builder: w1 s03', 'tu'])
-  const at = dispatch(desc('builder: w1 s03'), { epic: true, running: [...heavy, entry('heavy', now - 1000, { description: 'builder: w1 s04' })], lim: lim(), now })
-  assert.equal(at.block, true)
-  assert.match(at.reason, /3 heavy agents are running and the cap is 3/)
-  assert.match(at.reason, /builder: w1 s01 \(1 min\); fix: w1 s02 round 2 \(2 min\); builder: w1 s04/)
-  assert.match(at.reason, /Wait for a handback/)
-  const light = Array.from({ length: 9 }, (_, i) => entry('light', now - i))
-  assert.equal(dispatch(desc('review-small: w1 s01'), { epic: true, running: [...heavy, ...heavy, ...light], lim: lim(), now }).block, false, 'heavy agents do not count against light')
-  assert.equal(dispatch(desc('review-small: w1 s01'), { epic: true, running: [...light, entry('light', now)], lim: lim(), now }).block, true)
-  assert.equal(dispatch(desc('builder: w1 s01'), { epic: true, running: light.concat(light), lim: lim(), now }).block, false, 'light agents do not count against heavy')
-})
-
-test('dispatch: outside an epic, with BATON_MACHINE=0, or for any tool but Agent, nothing is refused or recorded', () => {
-  const full = Array.from({ length: 12 }, (_, i) => entry('heavy', i))
-  assert.deepEqual(dispatch(desc('builder: x'), { epic: false, running: full, lim: lim() }), { block: false })
-  assert.deepEqual(dispatch(desc('builder: x'), { epic: true, env: { BATON_MACHINE: '0' }, running: full, lim: lim() }), { block: false })
-  assert.deepEqual(dispatch({ tool_name: 'Bash', tool_input: {} }, { epic: true, running: full, lim: lim() }), { block: false })
-})
-
-test('stale entries are dropped: 90 minutes without a transcript write, 6 hours in all; a live transcript keeps its entry', () => {
-  const now = 100 * 60 * 60 * 1000
-  const fresh = entry('heavy', now - 1000)
-  const quiet = entry('heavy', now - STALE_AGENT_MS - 1, { agent_id: 'q' })
-  const writing = entry('heavy', now - 3 * 60 * 60 * 1000, { agent_id: 'w' })
-  const ancient = entry('heavy', now - MAX_AGENT_MS - 1, { agent_id: 'a' })
-  const mtimes = { [join('d', 'subagents', 'agent-q.jsonl')]: now - STALE_AGENT_MS - 5, [join('d', 'subagents', 'agent-w.jsonl')]: now - 60000, [join('d', 'subagents', 'agent-a.jsonl')]: now - 1000 }
-  const kept = live([fresh, quiet, writing, ancient], now, 'd', (p) => mtimes[p] ?? null)
-  assert.deepEqual(kept, [fresh, writing])
-  const full = [entry('heavy', now - STALE_AGENT_MS - 1), entry('heavy', now - STALE_AGENT_MS - 2), entry('heavy', now - STALE_AGENT_MS - 3)]
-  assert.equal(dispatch(desc('builder: x'), { epic: true, running: live(full, now, null), lim: lim(), now }).block, false)
-})
-
-test('hooks bind the id, free the entry on stop (by id, else by description), and a restart resets', () => {
-  const a = entry('heavy', 1, { id: 'tu1', description: 'builder: s1' })
-  const b = entry('heavy', 2, { id: 'tu2', description: 'builder: s2' })
-  const bound = apply('bound', { tool_use_id: 'tu1', tool_response: { status: 'async_launched', agentId: 'A1' } }, [a, b])
-  assert.equal(bound[0].agent_id, 'A1')
-  assert.equal(apply('bound', { tool_use_id: 'tu2', tool_response: { status: 'completed', agentId: 'B' } }, bound).length, 1, 'a foreground agent has finished')
-  assert.deepEqual(apply('stop', { agent_id: 'A1' }, bound).map((e) => e.id), ['tu2'])
-  assert.equal(apply('stop', { agent_id: 'nobody' }, bound).length, 2)
-  const dir = mkdtempSync(join(tmpdir(), 'mach-'))
-  writeFileSync(join(dir, 'agent-B.jsonl'), '')
-  writeFileSync(join(dir, 'agent-B.meta.json'), JSON.stringify({ description: 'builder: s2' }))
-  assert.deepEqual(apply('stop', { agent_id: 'B', agent_transcript_path: join(dir, 'agent-B.jsonl') }, bound).map((e) => e.id), ['tu1'])
-  assert.equal(resets({ source: 'startup' }) && resets({ source: 'resume' }), true)
-  assert.equal(resets({ source: 'compact' }) || resets({ source: 'clear' }), false)
-})
-
-// ---- the hooks, run as the harness runs them
-
-function session() {
-  const baton = mkdtempSync(join(tmpdir(), 'mach-'))
-  const dir = join(baton, 'sess')
-  mkdirSync(join(dir, 'subagents'), { recursive: true })
-  const env = { ...process.env, BATON_HOME: baton, BATON_EPIC: '1', BATON_MACHINE: '', BATON_PROJECT_CONFIG: '', BATON_HEAVY_SLOTS: '2', BATON_HEAVY_AGENTS: '3', BATON_LIGHT_AGENTS: '10' }
-  const run = (mode, input, e = {}) => {
-    const r = spawnSync(process.execPath, [script('agent-slots.mjs'), mode], {
-      input: JSON.stringify({ session_id: 's1', transcript_path: join(baton, 'sess.jsonl'), cwd: baton, tool_name: 'Agent', ...input }), encoding: 'utf8', env: { ...env, ...e },
-    })
-    return { status: r.status, stderr: r.stderr }
-  }
-  const state = () => JSON.parse(readFileSync(join(dir, 'baton-agents.json'), 'utf8')).agents
-  return { baton, dir, run, state }
-}
-const launch = (id, description) => ({ tool_use_id: id, tool_input: { description, prompt: 'x', model: 'sonnet' } })
-
-test('hooks end to end: the fourth builder is refused, a handback frees a place, a restart frees them all', () => {
-  const { run, state } = session()
-  for (const n of [1, 2, 3]) assert.equal(run('check', launch(`u${n}`, `builder: s${n}`)).status, 0)
-  const refused = run('check', launch('u4', 'fix: s4'))
-  assert.equal(refused.status, 2)
-  assert.match(refused.stderr, /3 heavy agents are running/)
-  assert.match(refused.stderr, /builder: s1.*builder: s2.*builder: s3/)
-  assert.equal(state().length, 3, 'a refused dispatch is not recorded')
-  assert.equal(run('check', launch('r1', 'review-small: s1')).status, 0, 'a reviewer is light')
-  run('bound', { tool_use_id: 'u1', tool_response: { status: 'async_launched', agentId: 'A1' } })
-  assert.equal(run('stop', { tool_name: undefined, agent_id: 'A1' }).status, 0)
-  assert.equal(run('check', launch('u4', 'fix: s4')).status, 0)
-  assert.equal(run('check', launch('u5', 'fix: s5')).status, 2)
-  run('reset', { source: 'compact' })
-  assert.equal(state().length, 4)
-  run('reset', { source: 'resume' })
-  assert.equal(state().length, 0)
-  assert.equal(run('check', launch('u5', 'fix: s5')).status, 0)
-})
-
-test('hooks end to end: outside an epic or with BATON_MACHINE=0 nothing is refused or recorded; a dispatch with no model is left to require-model', () => {
-  const { run, state, dir } = session()
-  for (const n of [1, 2, 3, 4]) assert.equal(run('check', launch(`u${n}`, `builder: s${n}`), { BATON_EPIC: '' }).status, 0)
-  assert.equal(existsSync(join(dir, 'baton-agents.json')), false)
-  for (const n of [1, 2, 3, 4]) assert.equal(run('check', launch(`u${n}`, `builder: s${n}`), { BATON_MACHINE: '0' }).status, 0)
-  assert.equal(existsSync(join(dir, 'baton-agents.json')), false)
-  assert.equal(run('check', { tool_use_id: 'x', tool_input: { description: 'builder: s9', prompt: 'x' } }).status, 0)
-  assert.equal(existsSync(join(dir, 'baton-agents.json')), false, 'an unnamed model is refused by require-model, so it is not counted here')
-  assert.equal(run('check', launch('u1', 'builder: s1')).status, 0)
-  assert.equal(state().length, 1)
-})
-
-test('hooks end to end: a stale entry in the file does not count, and parallel dispatches are counted once each', () => {
-  const { run, state, dir } = session()
-  const old = Date.now() - 2 * STALE_AGENT_MS
-  writeFileSync(join(dir, 'baton-agents.json'), JSON.stringify({ agents: [1, 2, 3].map((n) => entry('heavy', old, { id: `o${n}` })) }))
-  assert.equal(run('check', launch('u1', 'builder: s1')).status, 0)
-  assert.equal(state().length, 1)
-})
-
-test('hooks end to end: a hook given no JSON lets the call through', () => {
-  const r = spawnSync(process.execPath, [script('agent-slots.mjs'), 'check'], { input: 'not json', encoding: 'utf8' })
-  assert.equal(r.status, 0)
 })
 
 // ---- heavy.sh
