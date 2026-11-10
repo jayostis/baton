@@ -6,6 +6,8 @@
 # UNKNOWN or BEHIND PR. --allow names a check (by name prefix) that may be red; use it only for a check another repo's PR
 # turns green, which the PR body names. Any check not named must succeed or be skipped.
 set -u
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/lib/events.sh"
 repo=${1:-}; pr=${2:-}
 if [[ "$repo" != */* || -z "$pr" ]]; then echo "usage: gate.sh <owner/repo> <pr> [--merge] [--allow <check name>]..." >&2; exit 2; fi
 shift 2
@@ -45,7 +47,12 @@ okstate=""; [ "$state" = "CLEAN" ] && okstate=1
 [ ${#allowed[@]} -gt 0 ] && [ "$state" = "UNSTABLE" ] && okstate=1
 if [ -n "$okstate" ] && [ -z "$pending" ] && [ -z "$unallowed" ] && [ "$threads" = "0" ]; then
   echo "GATE PASSES"
-  [ -n "$merge" ] && gh pr merge "$pr" -R "$repo" --merge && echo "merged"
+  if [ -n "$merge" ]; then
+    # A failed merge is not a merged one: gh's own message is on stderr, and the exit code says so.
+    gh pr merge "$pr" -R "$repo" --merge || { echo "MERGE FAILED: gh pr merge exited non-zero for $repo#$pr" >&2; exit 1; }
+    echo "merged"
+    ev merge repo="$repo" pr="$pr" head="$head"
+  fi
   exit 0
 fi
 echo "GATE DOES NOT PASS"

@@ -7,8 +7,8 @@ settlement sections, the settled list, the repo's `CLAUDE.md` (its rules are rev
 
 ## Where
 
-Use the project's `review_worktree` tool for a standing worktree, in the slot your prompt names (two reviewers
-once shared a slot and switched each other's head). Never review in a main clone,
+Run the `review_worktree` call your prompt gives, as given, slot included (two reviewers once shared a slot and
+switched each other's head); if it has none, the project config has the form. Never review in a main clone,
 never add a fresh worktree, never `npm ci`. Read files at the PR head, and cite `file:line` in the branch, not lines
 of diff output.
 

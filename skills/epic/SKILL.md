@@ -6,28 +6,27 @@ argument-hint: "<epic> | resume <epic> | retro <epic>"
 
 # /baton:epic
 
-You orchestrate. You dispatch, read, gate, merge and log. You build nothing beyond a one-line edit. Every cost
-decision below was learned in an epic that ignored it; read the ledger, not your impression of the spend.
+You orchestrate. You dispatch, read, gate, merge and log. You build nothing beyond a one-line edit. Read the ledger, not
+your impression of the spend.
 
 ## Start
 
 1. **Project config.** Read once: `${user_config.project_config}`, else `.baton/project.md` in the repo you are in.
-   Without one, ask for it and stop. It names `run_folders`, worktree tools, verify command, Depends-On pairing,
-   rulings with reasons, the stop line and probe files.
+   Without one, ask for it and stop.
 2. **Run folder** `<epic>/`: a name with no slash means `<run_folders>/<name>` from the config; a path is used as
    given. Without `run_folders`, ask. Working state only: `HANDOFF.md` (template
    `${CLAUDE_PLUGIN_ROOT}/references/handoff.md`), `run.md`, `waves.json`, `steps/`, `notes/<step>.md`. `resume` reads
    `HANDOFF.md` and continues; GitHub is the record, this machine a cache.
 
-   Anything lasting (design, research, results, reviews, decisions, the walk and retro report) goes on GitHub
-   the same turn. Delete the run folder when the epic closes; a paused epic keeps it.
+   Anything lasting (design, research, results, decisions, reports) goes on GitHub the same turn. Delete the run folder when the epic closes; a paused epic keeps it.
 
 3. **Roles.** `${CLAUDE_PLUGIN_ROOT}/references/roles.json` is the table: role, model, effort, token target, brief.
-   Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`. Read the table, do not restate it.
-4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which is what turns the
-   model rule on; `off` when the retro is done. Without it no dispatch is refused.
+   Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`.
+4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which turns on the model
+   and dispatch hooks; `off` when the retro is done.
 5. **Lessons.** `${CLAUDE_PLUGIN_ROOT}/references/lessons.md`, tagged by role. Read the `[orchestrator]` and `[all]`
    lines now; each brief names the tag its agent reads.
+6. **Machine and CI.** Read the config's `machine:` section and CI's runtime (`references/pace.md`).
 
 ## The loop
 
@@ -39,27 +38,31 @@ said in one line, never raised again.
 together against the code. Apply its must-fixes to the issues. It also assigns each step a role and a wave. Steps that
 want a design call get Opus; nothing else does.
 
-**Waves.** Three to four agents at once; one at a time for anything that takes the Docker lock or times a run. Before
-a wave starts, add it to `waves.json` (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when
-its last PR merges. `budgetUnits` and the role table's `unitTarget` (or `unitTargetByModel` for the model that runs) are both cost units, so
-the first budget is the sum of the wave's agents' targets, and later ones
-come from the ledger.
+**Waves.** Agents at once are capped by weight, heavy (builders, fixers) and light (readers, reviewers), from the
+project config's `machine` section else this machine (`node "${CLAUDE_PLUGIN_ROOT}/scripts/machine.mjs"` prints the caps).
+The dispatch hook enforces the cap by weight: wait for a handback. It also adds the pace flags to a dispatch as context; act on them before that dispatch. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/heavy.sh" <command>`
+is the recommended way to run a local suite, in the Bash tool with `timeout: 600000` (it is bash: PowerShell users go
+through that tool), on the changed files only; CI runs the full suite, the seeds and coverage. One at a time for anything that takes the Docker lock or times a run. Before a wave starts, add it to `waves.json`
+(`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when its last PR merges. `budgetUnits` is cost
+units: the sum of the wave's agents' role targets at first, then from the ledger.
 
-**Dispatch.** Every general-purpose `Agent` call names `model` and `effort` from the role table, and starts its
-`description` with the role key (`fix: w3 round 2`), which is how the ledger knows the role; the `PreToolUse` hook
-refuses an unnamed model. The prompt has five lines for every role: 1 the subject (`<repo>#<n> <title>`, the PR, or the
-command), 2 the absolute path of the role's brief, 3 the input file (step file, findings file, success exit code; blank
-if none), 4 the absolute plugin root (`${CLAUDE_PLUGIN_ROOT}`, which the briefs' `references/` paths hang from), 5 the absolute
-path of the project config. Then only what you hold that the issue does not (rulings, seam names, suites that cannot go
-green yet), once, up front. Before dispatching a fix, name the code path that shows the behaviour; five minutes of
-grep is cheaper than a round.
+**Sharpen first** (`references/pace.md`). The pilot also measures the loop: after its handback, a review of
+`ledger.mjs <session-dir> --time` names what will repeat N times and its cost each time; the tools that cut it come
+from that. Wave 0 builds what every step will run and tries it on the pilot before wave 1 dispatches. One agent whose
+description key is `sharpen:` runs past the caps. At each wave boundary the top sink of `--time` gets one fix first.
+
+**Dispatch.** Every general-purpose `Agent` call takes its prompt from
+`node ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.mjs <role> "<step key>" "<subject>" [--input <file>] [--slot <n>]`, which prints the
+`description` to pass (`fix: w3 s07b words`: the role key, the step key, a fix's reason; the ledger reads role and step
+from it), the model and effort, the prompt's five lines and a reviewer's `review_worktree` call. Pass them as printed;
+the `PreToolUse` hook refuses an unnamed model. Then add only what you hold that the issue does not (rulings, seam names,
+suites that cannot go green yet), once, up front. Before dispatching a fix, name the code path that shows the behaviour.
 
 **Handback.** The agent ends with the block in `${CLAUDE_PLUGIN_ROOT}/references/handback.md`. Run
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs <session-dir> --agent <id>`, paste its line above the block in
-`run.md`, and keep the block's one proposed change for the retro. A report is model output: check the repo.
-Builders hand back once. Nothing is sent to an agent that has handed back; a fix round is a fresh agent. The
-`SendMessage` hook enforces that; a message to a running agent always passes, so a stop reaches it. A `SubagentStop`
-hook appends each agent's ledger row to the run log.
+`run.md`, and sharpen (below).
+Nothing is sent to an agent that has handed back; a fix round is a fresh agent. The
+`SendMessage` hook enforces that; a message to a running agent always passes.
 
 **CI.** One blocking command, run in the background by you (or by a `mechanical` agent when it is more than one
 command), using `bash ${CLAUDE_PLUGIN_ROOT}/scripts/wait-ci.sh <owner/repo> <pr>`. Nobody polls; no
@@ -67,23 +70,33 @@ builder waits. Red goes to a fresh `fix` agent with a log excerpt, never to the 
 
 **Review.** Every PR gets an independent reader, `reviewer.md`, read-only, returning a ranked list. New logic gets
 `review-new-logic`; a small or mechanical diff gets `review-small`; a byte-identical regeneration may be read by
-you, logged. Related PRs may share one reviewer. A reviewer's prompt names the PR, its review slot, the red log, the
-local runs and the partner heads, so it does not rediscover them.
+you, logged. Related PRs may share one reviewer. Its prompt also names the red log, the local runs and the partner heads,
+so it does not rediscover them.
 
 **Fix.** A fresh `fix` agent, brief `fix.md`, given the findings file and the branch, not the history. The findings
 file quotes the reviewer's items and any ruling they touch word for word, and names the targeted test command from the
-project config. More than ten findings: split into two agents. It posts one PR comment and pushes. A CI red on a
-branch whose fixer is still running goes to that fixer by `SendMessage`. Never `/baton:pr loop` in an epic.
+project config. It opens with `Reason: <word>` (words, test, review, ci-red, flake, conflict, other), which `dispatch.mjs`
+puts in the description. More than ten findings: split into two agents. It posts one PR comment and pushes. A CI red on
+a branch whose fixer is still running goes to that fixer by `SendMessage`. Never `/baton:pr loop` in an epic.
 
 **Merge.** Only through `bash ${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh <owner/repo> <pr> [--merge] [--allow <check>]...`,
 only after the maintainer has said in chat that you may, the date recorded in `HANDOFF.md`. The gate reads state
-itself (mergeability, checks on the current head, threads), never a review: before merging, confirm the PR's head is
-the one reviewed (or a fix round's push the review covered). An agent's report is never the gate. `--allow` is only
-for a check a Depends-On partner's PR turns green, which the PR body names. No `--admin`. Pairs merge back to back.
+itself (mergeability, checks on the current head, threads), never a review: confirm the PR's head is the one reviewed
+(or a fix round's push the review covered). `--allow` is only for a check a Depends-On partner's PR turns green, which
+the PR body names. No `--admin`. Pairs merge back to back.
 After each merge, start `wait-ci.sh` on the base branch's new head in the background; a red main is the next fix.
 
 **Walk.** When the last PR is merged, the `walk` role, `walk.md`, drives what shipped. Its findings become issues;
 count them for the retro.
+
+## Sharpen as you go
+
+At every handback read the block's proposed change and `ledger.mjs <session-dir> --pace` (rounds by reason, minutes
+per step). A change that would
+save a round, an agent or a recurring wait is applied before the next dispatch, not kept for the retro: a tool built, a
+brief or template fixed, a gate cut. Log it in `run.md` as "Sharpened". One reason twice is a tool or brief gap: build it
+before the next agent of that role. Only a change to this skill's own design waits for the retro.
+Hooks and scripts mark time by themselves; never time anything by hand, and profile only a sink `--time` calls big.
 
 ## Decide, do not ask
 
@@ -93,32 +106,23 @@ standing rulings issue, with your lean, batched. Do not wait on an answer you ca
 
 ## Cost
 
-- Run `ledger.mjs <session-dir> --waves <epic>/waves.json --strict` at the end of each wave and whenever a
-  status is due. It prints cost units per agent, per model and per wave against the budget, and warns on an agent past
-  the context ceiling or past its role's token target.
-- Status to the maintainer, at wave boundaries and whenever a budget is exceeded, not every message: what merged
-  (issue titles with links), what is waiting on them, reviews and skips named, the decisions made without them, and a
-  usage line from the ledger (units, or a percent of the week once `roles.json` has a calibration).
-- Cost units are not tokens: weights per model and token kind are in `roles.json`, and each retro may recalibrate them.
-  Each retro resets the calibration from a fresh reading of the maintainer's usage meter.
+- Run `ledger.mjs <session-dir> --waves <epic>/waves.json --strict` at each wave's end and when a
+  status is due. It warns on an agent past the context ceiling or its target, and a wave past its budget.
+- Status to the maintainer at wave boundaries and when a budget is exceeded: what merged (titles with links), what waits
+  on them, reviews and skips, decisions made without them, a usage line from the ledger.
 
 ## Your own context
 
 You are the most expensive agent in the run: every turn re-reads your whole context. At each wave boundary, and only
-there, run `ledger.mjs --self --waves <epic>/waves.json`. It prints your last context (what the next turn re-reads; a
-compaction resets it, the peak never) and whether a fresh session, over as many turns as the last wave, would save at
-least `handoff.minimumUnitsSaved` in `roles.json`. On yes: stop dispatching, write `HANDOFF.md` (wave state with merge
-commits, what is waiting on the maintainer, tool paths, stale locks, agents in flight), push whatever is unpushed, and
-tell the maintainer to start a fresh session with `/baton:epic resume <epic>`. On no, carry on and say nothing about
-it. Either way, paste the `handoff-decision` line it prints into `run.md` as one line, so the retro can read it back. Never judge your context from memory or a compaction summary: they carry the number from before the compaction.
+there, run `ledger.mjs --self --waves <epic>/waves.json`. It prints your last context and whether a fresh session would save at least `handoff.minimumUnitsSaved`. On yes: stop dispatching, write `HANDOFF.md`, push whatever is unpushed, and
+tell the maintainer to start a fresh session with `/baton:epic resume <epic>`. On no, carry on. Either way, paste the
+`handoff-decision` line it prints into `run.md`. Never judge your context from memory or a compaction summary.
 
 ## Retro
 
-When the walk is done, `retro.md`. It ends in one PR to baton that the maintainer merges; nothing here updates itself.
+When the walk is done, `retro.md`: one PR to baton, which the maintainer merges.
 
 ## Rules that outlive a brief
 
 - A rule with a script check is the script. Call `scripts/`, never paraphrase a flag list.
 - The repo is the witness: `git log origin/<branch>`, the PR's checks on its head SHA, the threads.
-- Never `/baton:pr loop`; never resume a finished agent; never name a model by omission.
-- A measurement that changes no decision is not taken.

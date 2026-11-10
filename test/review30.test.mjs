@@ -221,7 +221,7 @@ test('nit: threads list logs counts, not thread bodies; comments.md shows the th
 test('S5/S6: deliver names scoped agents; every brief states the layout the skill gives, project config included', () => {
   const d = read('skills/deliver/SKILL.md')
   for (const a of ['deliver-tests-agent', 'deliver-implement-agent', 'deliver-checklist-agent']) assert.match(d, new RegExp(`baton:deliver:${a}`))
-  assert.match(read('skills/epic/SKILL.md'), /5 the absolute\s+path of the project config/)
+  assert.match(read('scripts/dispatch.mjs'), /5\. <project config>/, 'dispatch.mjs, which prints the prompt, states its five lines')
   for (const f of ['builder', 'fix', 'reviewer', 'mechanical', 'critical-read', 'walk']) {
     const t = read(`skills/epic/${f}.md`)
     assert.match(t, /Prompt lines: 1 [^\n]*2 this file/, f)

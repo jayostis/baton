@@ -3,10 +3,17 @@
 # then print each run's conclusion and each failed or pending check. Run it with run_in_background.
 #   wait-ci.sh <owner/repo> <pr-number>
 #   wait-ci.sh <owner/repo> --commit <full-40-char-sha>
-# Exit 0 when every check succeeded or was skipped, 1 otherwise.
+# Exit 0 when every check succeeded or was skipped, 1 otherwise. Appends ci-wait-start and ci-wait-end (repo, PR or
+# commit, result, seconds) to the epic's event log, scripts/event.mjs.
 set -u
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/lib/events.sh"
 repo=${1:-}; arg=${2:-}
 if [[ "$repo" != */* || -z "$arg" ]]; then echo "usage: wait-ci.sh <owner/repo> <pr> | <owner/repo> --commit <sha>" >&2; exit 2; fi
+started=$SECONDS
+if [ "$arg" = "--commit" ]; then ev ci-wait-start repo="$repo" sha="${3:-}"; else ev ci-wait-start repo="$repo" pr="$arg"; fi
+ci_end() { local rc=$? r=error; [ "$rc" -eq 0 ] && r=passed; [ "$rc" -eq 1 ] && r=not-passing; ev ci-wait-end repo="$repo" ${pr:+pr="$pr"} sha="${sha:-}" exit="$rc" result="$r" wall_s="$(( SECONDS - started ))"; }
+trap ci_end EXIT
 if [ "$arg" = "--commit" ]; then sha=${3:?--commit needs a sha}; pr=""; else
   pr=$arg
   # A branch name or a stray sha in the PR's place found no PR and once still printed "all checks passed".

@@ -11,7 +11,9 @@
 //   node ledger.mjs ... --clip                                                count only turns inside --since/--until
 //   node ledger.mjs ... --percentiles                                         count, median, p90 and max of units per role and model
 //   node ledger.mjs --handoffs <run.md> [--next <session-dir>]               the handoff decisions logged in run.md; with --next, the first yes against that session
-//   node ledger.mjs ... --strict                                              exit 1 on a warning
+//   node ledger.mjs ... --pace                                                per step: rounds and minutes; flags 2+ rounds and a builder past twice the builders' median
+//   node ledger.mjs <session-dir> --time [--all]                              per step, wave and epic: where the minutes went (transcript split, event log, orchestrator latency); --all lists every step
+//   node ledger.mjs ... --strict                                             exit 1 on a warning
 //
 // --self finds this session by CLAUDE_CODE_SESSION_ID in every project folder, so it works from any directory; with no
 // id it falls back to the newest transcript in this directory's project folder. --all with --clip is how a retro
@@ -28,6 +30,13 @@ import { join, basename, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { summarize, mainModel, instant } from './lib/transcript.mjs'
 import { loadRoles, units, show, familyOf } from './lib/roles.mjs'
+import { stepOf, reasonOf } from './lib/steps.mjs'
+import { timeSplit, transcriptMerges, extraHeavy } from './lib/timing.mjs'
+import { readMachineSection } from './lib/machine.mjs'
+import { timeReport } from './lib/time-report.mjs'
+import { readEvents, heavyFallbackPath, EVENTS_FILE } from './lib/events.mjs'
+
+export { stepOf }
 
 function agents(dir) {
   const rows = []
@@ -86,7 +95,8 @@ export function agentRow(s, { id, name, roles = loadRoles() }) {
 }
 
 // With clip, turns outside [since, until) are not counted at all; without it an agent is in or out whole.
-export function ledger(dir, since, until, roles = loadRoles(), clip = false) {
+// With time, each row also carries its transcript's time split and its subject line (for `--time`).
+export function ledger(dir, since, until, roles = loadRoles(), clip = false, { time = false, heavy = null } = {}) {
   const rows = []
   const main = join(dirname(dir), `${basename(dir)}.jsonl`)
   const files = existsSync(main) && statSync(main).isFile() ? [main, ...agents(dir)] : agents(dir)
@@ -95,11 +105,13 @@ export function ledger(dir, since, until, roles = loadRoles(), clip = false) {
     if (!s || s.turns === 0) continue
     if (since && s.last && instant(s.last) < instant(since)) continue
     if (until && s.first && instant(s.first) > instant(until)) continue
-    rows.push(agentRow(s, {
+    const row = agentRow(s, {
       id: path === main ? basename(dir) : basename(path, '.jsonl').replace(/^agent-/, ''),
       name: path === main ? 'orchestrator' : describe(path, s),
       roles,
-    }))
+    })
+    if (time) Object.assign(row, { time: timeSplit(path, heavy), subject: s.prompt.split('\n')[0].trim() })
+    rows.push(row)
   }
   return rows.sort((a, b) => b.units - a.units)
 }
@@ -210,6 +222,40 @@ export function rolePercentiles(rows, roles = loadRoles()) {
   }))
 }
 
+// The agents of one role that ran past twice that role's median minutes (the lower median, nearest rank).
+export function overruns(rows, role) {
+  const same = rows.filter((r) => String(r.agent).trim().split(/[s:]/)[0].toLowerCase() === role && r.minutes != null).sort((a, b) => a.minutes - b.minutes)
+  if (!same.length) return []
+  const median = same[Math.min(same.length - 1, Math.ceil(same.length / 2) - 1)].minutes
+  return same.filter((r) => r.minutes > 2 * median).map((r) => ({ agent: r.agent, id: r.id, minutes: r.minutes, median }))
+}
+
+// Per step: rounds (fix agents, plus cold reads after the first), and minutes from the first dispatch to the last
+// handback. Flags a step on two rounds or more, and a builder past twice the median minutes of the builders. Read from
+// the rows the ledger already has; nothing is measured that was not.
+export function pace(rows) {
+  const word = (r) => String(r.agent).trim().split(/[\s:]/)[0].toLowerCase()
+  const steps = new Map()
+  const reasons = {}
+  for (const r of rows) {
+    const key = stepOf(r.agent)
+    if (!key) continue
+    const s = steps.get(key) ?? { key, fix: 0, cold: 0, start: Infinity, end: -Infinity }
+    if (word(r) === 'fix') { s.fix += 1; reasons[reasonOf(r.agent)] = [...(reasons[reasonOf(r.agent)] ?? []), key] }
+    if (word(r) === 'cold-read') s.cold += 1
+    s.start = Math.min(s.start, instant(r.start))
+    s.end = Math.max(s.end, instant(r.end))
+    steps.set(key, s)
+  }
+  const out = [...steps.values()].map((s) => ({ step: s.key, rounds: s.fix + Math.max(0, s.cold - 1), minutes: Number.isFinite(s.end - s.start) ? Math.round((s.end - s.start) / 60000) : null }))
+  const flags = out.filter((s) => s.rounds >= 2).map((s) => `${s.step}: ${s.rounds} rounds, a tool or brief gap to build before the next agent of that role`)
+  for (const [reason, keys] of Object.entries(reasons)) {
+    if (reason !== 'other' && keys.length >= 2) flags.push(`${reason}: ${keys.length} fix rounds (${keys.join(', ')}) for one reason, a tool or brief gap to build before the next agent of that role`)
+  }
+  for (const b of overruns(rows, 'builder')) flags.push(`${b.agent} (${b.id}): ${b.minutes} min, past twice the builder median of ${b.median}`)
+  return { steps: out, flags, reasons: Object.fromEntries(Object.entries(reasons).map(([r, k]) => [r, k.length])) }
+}
+
 export function inWave(row, wave) {
   return instant(row.start) >= instant(wave.from) && (!wave.to || instant(row.start) < instant(wave.to))
 }
@@ -283,7 +329,8 @@ export function main(args) {
     if (!decisions.length) console.error(`no handoff-decision lines in ${flag('--handoffs')}`)
     return decisions.length ? 0 : 2
   }
-  const all = args.includes('--all')
+  const timed = args.includes('--time')
+  const all = args.includes('--all') && !timed
   const self = args.includes('--self')
   const target = self ? dir || selfSession(process.cwd()) : projectDir || dir
   if (!all && (!target || !(existsSync(target) || existsSync(`${target}.jsonl`)))) {
@@ -310,7 +357,7 @@ export function main(args) {
   const since = wave ? wave.from : flag('--since')
   const until = wave ? wave.to : flag('--until')
   const clip = args.includes('--clip')
-  let rows = all ? allLedger(since, until, roles, clip) : projectDir ? projectLedger(projectDir, since, until, roles, clip) : ledger(target, since, until, roles, clip)
+  let rows = all ? allLedger(since, until, roles, clip) : projectDir ? projectLedger(projectDir, since, until, roles, clip) : ledger(target, since, until, roles, clip, { time: timed, heavy: timed ? extraHeavy(readMachineSection().heavy_commands) : null })
   if (wave) rows = rows.filter((r) => inWave(r, wave))
   if (flag('--agent')) {
     const line = agentLine(rows, flag('--agent'))
@@ -319,6 +366,25 @@ export function main(args) {
       return 2
     }
     console.log(line)
+    return 0
+  }
+  if (timed) {
+    const session = basename(target)
+    const stamps = rows.map((r) => instant(r.start)).filter(Number.isFinite)
+    const window = [Math.min(...stamps) - 60000, Math.max(...rows.map((r) => instant(r.end)).filter(Number.isFinite)) + 60000]
+    const own = readEvents(join(target, EVENTS_FILE))
+    const loose = readEvents(heavyFallbackPath()).filter((e) => (!e.session || e.session === session) && instant(e.at) >= window[0] && instant(e.at) <= window[1])
+    const report = timeReport({ rows, events: [...own, ...loose], merges: transcriptMerges(`${target}.jsonl`), all: args.includes('--all'), session: session.slice(0, 8) })
+    console.log(report.lines.join('\n'))
+    return 0
+  }
+  if (args.includes('--pace')) {
+    const p = pace(rows)
+    for (const s of p.steps.sort((a, b) => b.rounds - a.rounds || (b.minutes ?? 0) - (a.minutes ?? 0))) console.log(`${s.step}: ${s.rounds} rounds, ${s.minutes ?? '?'} min`)
+    const why = Object.entries(p.reasons).sort((a, b) => b[1] - a[1]).map(([r, n]) => `${r} ${n}`).join(', ')
+    if (why) console.log(`fix rounds by reason: ${why}`)
+    for (const f of p.flags) console.log(`slow: ${f}`)
+    if (!p.steps.length) console.error('no agent description names a step ("w3 s07b" or "w0 #641")')
     return 0
   }
   if (args.includes('--percentiles')) {

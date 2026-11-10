@@ -31,7 +31,8 @@
 [orchestrator] A usage-limit stop kills every agent; only pushed work survives, so tell builders to push early.
 [orchestrator] Cite files and symbols in step files, not line numbers; they went stale within a wave.
 [orchestrator] Put each recurring must-fix class in the next step file as an acceptance check.
-[orchestrator] Notes between steps go one file per step; one shared file grew to 766 lines and conflicted on its index.
+[orchestrator] Sharpen during the epic, not at the retro: apply each handback's proposed change that saves a round or a wait, and build the tool or fix the brief on a second round for one reason (a cold-read words loop ran three rounds on each of three PRs; a wrong review-wt.sh call was repeated in several prompts; builders' tool asks were logged "for the retro").
+[orchestrator] 20 agents with four or five local test suites locked a 4-core machine into a restart (2026-11-10); the cap is a dispatch hook sized by the machine, heavy and light apart, and heavy.sh holds local suites to its slots.
 [critical-read] Reading all steps together found 15 must-fixes in one epic and must-fixes in every other; per-step grooming did not.
 [critical-read] A step that rests on an unmeasured number is a step 0: one spike cancelled a step worth 71k tokens and 4 minutes.
 [critical-read] Set up the local fast loop first; a host runner removed Docker from the loop and made each check six times faster.

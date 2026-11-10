@@ -12,13 +12,13 @@ file, 4 the plugin root, 5 the project config. Read those, the project config's 
   test your change makes redundant; report the test counts before and after.
 - **Measure only what the issue says decides.** Otherwise write "none, because". Counts before wall time; three or
   more pairs for a timing.
-- **Affected tests only**, locally. The project's `verify_command` before every push. Merge `origin/main` before
+- **Run tests, builds and `verify_command` (before every push) as `bash "<plugin root>/scripts/heavy.sh" <command>`**
+  (recommended; Bash tool, `timeout: 600000`), on changed files only; the full gates are CI's. Merge `origin/main` before
   every push, as its own commit. Commit in coherent steps and push early: only pushed work survives a stopped run.
 - **Settled is settled.** Fallout from a ruling in the step file is applied and said in one line. Decide, do not
   ask. Stuck on a settled item: hand back as blocked, quoting it.
 - **Your not-done list is work.** Finish it in this PR, or say why it cannot be.
-- **Shell.** No `git stash`. Edit and Write for repo files, not heredocs. Start no background commands and do not
-  wait for CI; the orchestrator does.
+- **Shell.** No `git stash`. Edit and Write for repo files, not heredocs. Start no background commands.
 
 ## Before you hand back
 
@@ -40,10 +40,10 @@ per step.
 
 ## Context
 
-You cannot see your context, and every turn re-reads all of it. Read files by range and logs by tail.
+Every turn re-reads your whole context. Read files by range and logs by tail.
 Build one repo; if the step names another, push yours and hand back what is left for a fresh builder.
 
 ## Report
 
 At most 20 lines: the PR and its head SHA, the decisions you made, what you probed and found, then the handback block
-in `references/handback.md`. Do not report tokens or minutes; the ledger has them.
+in `references/handback.md`. Report no tokens or minutes.

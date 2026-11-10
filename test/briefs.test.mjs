@@ -22,6 +22,7 @@ const CAPS = {
   'skills/epic/walk.md': 400,
   'skills/epic/retro.md': 400,
   'references/handback.md': 400,
+  'references/pace.md': 600,
   'references/epic-step.yml': 400,
 }
 
@@ -69,6 +70,7 @@ test('the role table names a real brief and a model that has a weight, and no br
     assert.ok(existsSync(join(root, 'skills/epic', v.brief)), `${role}: brief ${v.brief} does not exist`)
     assert.ok(['opus', 'sonnet', 'haiku'].includes(v.model), `${role}: model ${v.model}`)
     assert.ok(roles.weights.models[v.model] > 0)
+    assert.ok(['heavy', 'light'].includes(v.local), `${role}: local ${v.local}`)
   }
   for (const f of Object.keys(CAPS)) assert.doesNotMatch(read(f), /\.(mjs|md|sh|yml):\d+/, `${f} cites a file:line`)
 })
@@ -98,7 +100,9 @@ test('hooks.json wraps its events, and every hook runs a script that exists', ()
   const hooks = JSON.parse(read('hooks/hooks.json')).hooks
   const pre = hooks.PreToolUse
   assert.deepEqual(pre.map((h) => h.matcher).sort(), ['Agent', 'SendMessage'])
-  for (const entry of pre) {
+  const events = [...pre, ...hooks.PostToolUse, ...hooks.SubagentStop]
+  assert.deepEqual(hooks.PostToolUse.map((h) => h.matcher), ['Agent'])
+  for (const entry of events) {
     for (const h of entry.hooks) {
       assert.equal(h.type, 'command')
       const script = /\$\{CLAUDE_PLUGIN_ROOT\}\/(scripts\/[a-z-]+\.mjs)/.exec(h.command)?.[1]
