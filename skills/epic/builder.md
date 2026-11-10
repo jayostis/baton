@@ -12,8 +12,8 @@ file, 4 the plugin root, 5 the project config. Read those, the project config's 
   test your change makes redundant; report the test counts before and after.
 - **Measure only what the issue says decides.** Otherwise write "none, because". Counts before wall time; three or
   more pairs for a timing.
-- **Tests and builds run as `bash <plugin root>/scripts/heavy.sh <command>`** (a hook refuses the rest), on the changed files only;
-  the full gates are CI's. The project's `verify_command` before every push. Merge `origin/main` before
+- **Run tests, builds and `verify_command` (before every push) as `bash "<plugin root>/scripts/heavy.sh" <command>`**
+  (recommended; Bash tool, `timeout: 600000`), on changed files only; the full gates are CI's. Merge `origin/main` before
   every push, as its own commit. Commit in coherent steps and push early: only pushed work survives a stopped run.
 - **Settled is settled.** Fallout from a ruling in the step file is applied and said in one line. Decide, do not
   ask. Stuck on a settled item: hand back as blocked, quoting it.

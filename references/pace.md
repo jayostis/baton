@@ -47,4 +47,4 @@ before the next wave dispatches; log it in `run.md` as "Sharpened".
 A fix description carries its reason after the step key: `fix: w3 s07b words`. The reasons are `words`, `test`, `review`,
 `ci-red`, `flake`, `conflict` and `other`; the findings file opens with `Reason: <word>`, and `dispatch.mjs` copies it
 into the description. `--pace` counts rounds by reason across steps and flags a reason seen twice (not `other`): that is a
-tool or brief gap, built before the next agent of that role.
+tool or brief gap, built before the next agent of that role. The dispatch hook raises the same flags, and slot waits over ten minutes, as context on a dispatch; act on them first.

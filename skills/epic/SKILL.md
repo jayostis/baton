@@ -22,8 +22,8 @@ your impression of the spend.
 
 3. **Roles.** `${CLAUDE_PLUGIN_ROOT}/references/roles.json` is the table: role, model, effort, token target, brief.
    Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`.
-4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which turns on the model,
-   dispatch and machine hooks; `off` when the retro is done.
+4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which turns on the model
+   and dispatch hooks; `off` when the retro is done.
 5. **Lessons.** `${CLAUDE_PLUGIN_ROOT}/references/lessons.md`, tagged by role. Read the `[orchestrator]` and `[all]`
    lines now; each brief names the tag its agent reads.
 6. **Machine and CI.** Read the config's `machine:` section and CI's runtime (`references/pace.md`).
@@ -39,11 +39,10 @@ together against the code. Apply its must-fixes to the issues. It also assigns e
 want a design call get Opus; nothing else does.
 
 **Waves.** Agents at once are capped by weight, heavy (builders, fixers) and light (readers, reviewers), from the
-project config's `machine` section else this machine; `node ${CLAUDE_PLUGIN_ROOT}/scripts/machine.mjs` prints the caps, and
-the dispatch hook refuses past them: wait for a handback. Every local build or test runs through
-`bash ${CLAUDE_PLUGIN_ROOT}/scripts/heavy.sh <command>`, which the Bash hook enforces, on the changed files only; the full
-suite, random-order seeds and coverage run in CI, which is free compute beside this machine. One at a time for anything
-that takes the Docker lock or times a run. Before a wave starts, add it to `waves.json`
+project config's `machine` section else this machine (`node "${CLAUDE_PLUGIN_ROOT}/scripts/machine.mjs"` prints the caps).
+The dispatch hook enforces the cap by weight: wait for a handback. It also adds the pace flags to a dispatch as context; act on them before that dispatch. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/heavy.sh" <command>`
+is the recommended way to run a local suite, in the Bash tool with `timeout: 600000` (it is bash: PowerShell users go
+through that tool), on the changed files only; CI runs the full suite, the seeds and coverage. One at a time for anything that takes the Docker lock or times a run. Before a wave starts, add it to `waves.json`
 (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when its last PR merges. `budgetUnits` is cost
 units: the sum of the wave's agents' role targets at first, then from the ledger.
 
@@ -92,8 +91,8 @@ count them for the retro.
 
 ## Sharpen as you go
 
-At every handback read the block's proposed change and `ledger.mjs <session-dir> --pace` (rounds by reason and minutes
-per step; it flags two rounds, a reason seen twice, and a builder past twice the builders' median). A change that would
+At every handback read the block's proposed change and `ledger.mjs <session-dir> --pace` (rounds by reason, minutes
+per step). A change that would
 save a round, an agent or a recurring wait is applied before the next dispatch, not kept for the retro: a tool built, a
 brief or template fixed, a gate cut. Log it in `run.md` as "Sharpened". One reason twice is a tool or brief gap: build it
 before the next agent of that role. Only a change to this skill's own design waits for the retro.

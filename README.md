@@ -75,7 +75,7 @@ lines. The briefs refer to its entries by these names; each is a command, a path
 | `traps` | a folder of dated entries, each with the test that proves it, loaded by grep on a topic, never pasted |
 | `probes` | per-repository probe lists for reviewers |
 | `locks` | the lock primitive for Docker and timed runs |
-| `machine` | a `## machine` section of `key: value` lines: `heavy_slots`, `heavy_agents`, `light_agents`, `heavy_commands` (comma-separated patterns); each optional, defaulted from the machine's cpus and memory |
+| `machine` | a `## machine` section of `key: value` lines: `heavy_slots`, `heavy_agents`, `light_agents`, and `heavy_commands` (comma-separated patterns the time report counts as heavy; reporting only); each optional, defaulted from the machine's cpus and memory |
 
 A project's own file lives in that project, never here.
 
@@ -105,16 +105,20 @@ A project's own file lives in that project, never here.
   row to the run log. `BATON_CONTEXT_CEILING` and `BATON_REQUIRE_MODEL=0` adjust them.
 - **The machine's limits**, in an epic only: an agent costs the machine what it runs, not by the head. Each role in
   `references/roles.json` is `local` heavy (builders, fixers, mechanical: they run tests and builds) or light (readers,
-  reviewers; `defaultLocal` names the description keys the table lacks). `scripts/agent-slots.mjs` refuses an `Agent`
-  call that would pass `heavy_agents` or `light_agents`, keeping the running agents in a file in the session's folder:
-  recorded at dispatch (a dispatch cannot know its agent's id), bound to the id by the `PostToolUse` result, removed at
-  `SubagentStop`, dropped after 90 minutes without a transcript write or 6 hours, and cleared by `SessionStart` on a
-  start or resume (a restart kills every agent in flight). `scripts/heavy-command.mjs` refuses, on `Bash` and
-  `PowerShell`, a test runner or build not run through `scripts/heavy.sh <command>`, a semaphore of `heavy_slots`
-  folders under the temp directory that reclaims a dead owner's slot and sizes pytest-xdist's `-n auto` to its share of
-  the cpus; the refusal gives the command to run. Claude Code runs `PreToolUse` hooks for a subagent's tool calls too, so
-  this covers builders. `node scripts/machine.mjs` prints the limits. `BATON_MACHINE=0` turns both hooks off and
-  `heavy.sh` into a plain exec.
+  reviewers; `defaultLocal` names the description keys the table lacks). One `PreToolUse` hook on `Agent`,
+  `scripts/dispatch-hook.mjs`, refuses a dispatch that would pass `heavy_agents` or `light_agents`, naming the running
+  agents. It keeps no state: the running agents are Claude Code's own `<session-dir>/subagents/agent-*.meta.json`, minus
+  those marked `finished` and those whose transcript has not been written for 90 minutes. A fresh session starts with
+  none; on a resume of the same session the agents a restart killed have no `finished`, so they count until their 90
+  quiet minutes are up. One `sharpen:` agent passes the caps. Any error reading or parsing lets the dispatch through,
+  with one line on stderr. `scripts/heavy.sh <command>` is a recommended helper, not enforced: bash, so a PowerShell
+  user calls it through the Bash tool, with `timeout: 600000` because it waits for a free slot. It holds local suites to
+  `heavy_slots` folders under the temp directory, runs the command in its own process group and kills the group on a
+  signal before freeing the slot, reclaims a dead owner's slot, and sizes pytest-xdist's `-n auto` to its share of the
+  cpus. It reads the slot count from `BATON_HEAVY_SLOTS`, else from `baton-machine.json` in the temp directory, which the
+  dispatch hook refreshes from the project config (the plugin's options are not in the Bash tool's environment), else from
+  the machine; with none readable, one slot. `node scripts/machine.mjs` prints the limits. `BATON_MACHINE=0` turns the
+  hook off and `heavy.sh` into a plain exec.
 - **Pace**, `references/pace.md`: sharpen from the first step, and mark time without becoming the slow part. In an epic the
   hooks and scripts that already run append events (`dispatch`, `launched`, `handback`, `heavy-wait`, `heavy-start`,
   `heavy-end`, `ci-wait-start`, `ci-wait-end`, `merge`, and `scripts/mark.mjs <label> [k=v...]` by hand) to
@@ -126,7 +130,10 @@ A project's own file lives in that project, never here.
   (`fix: w3 s07b words`: words, test, review, ci-red, flake, conflict, other), which `--pace` counts and flags when seen
   twice. `scripts/dispatch.mjs <role> "<step key>" "<subject>"` prints the description, model, effort and the prompt's five
   lines, with a reviewer's `review_worktree` call and slot from the project config. One agent whose description key is
-  `sharpen:` runs past the caps.
+  `sharpen:` runs past the caps. The dispatch hook also adds up to three lines of pace flags to a dispatch (the step is on
+  a second or later round, a round reason seen twice with no `Sharpened` line in the run log since, an agent of the
+  dispatched role past twice that role's median, slot waits over ten minutes in the wave); it warns, never blocks, and is
+  silent when it cannot read the data.
 - **Lessons**, `references/lessons.md`: one-line rules tagged by role, capped at 80 lines by a test.
 - **Retro**, `skills/epic/retro.md`: runs the ledger, compares with the project's `epics.csv`, reads the handback blocks and
   opens one PR to this repository. The maintainer merges it; nothing updates itself. `scripts/history.mjs` builds
