@@ -115,6 +115,18 @@ A project's own file lives in that project, never here.
   the cpus; the refusal gives the command to run. Claude Code runs `PreToolUse` hooks for a subagent's tool calls too, so
   this covers builders. `node scripts/machine.mjs` prints the limits. `BATON_MACHINE=0` turns both hooks off and
   `heavy.sh` into a plain exec.
+- **Pace**, `references/pace.md`: sharpen from the first step, and mark time without becoming the slow part. In an epic the
+  hooks and scripts that already run append events (`dispatch`, `launched`, `handback`, `heavy-wait`, `heavy-start`,
+  `heavy-end`, `ci-wait-start`, `ci-wait-end`, `merge`, and `scripts/mark.mjs <label> [k=v...]` by hand) to
+  `<session-dir>/baton-events.jsonl`, or for a script with no session id to `baton-heavy-events.jsonl` in the temp
+  directory; `BATON_EVENTS=0` turns it off. `ledger.mjs <session-dir> --time` reads them with each agent's transcript
+  (wall, tool and model time, tool time by kind, the longest calls): per step the wall clock to merge, heavy cpu and
+  slot wait, CI wait, rounds by reason and the orchestrator's latency; per wave and for the epic, where the minutes
+  went and the top three sinks. It is beside `--pace`, not in it. A fix agent's description carries its round's reason
+  (`fix: w3 s07b words`: words, test, review, ci-red, flake, conflict, other), which `--pace` counts and flags when seen
+  twice. `scripts/dispatch.mjs <role> "<step key>" "<subject>"` prints the description, model, effort and the prompt's five
+  lines, with a reviewer's `review_worktree` call and slot from the project config. One agent whose description key is
+  `sharpen:` runs past the caps.
 - **Lessons**, `references/lessons.md`: one-line rules tagged by role, capped at 80 lines by a test.
 - **Retro**, `skills/epic/retro.md`: runs the ledger, compares with the project's `epics.csv`, reads the handback blocks and
   opens one PR to this repository. The maintainer merges it; nothing updates itself. `scripts/history.mjs` builds

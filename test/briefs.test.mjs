@@ -22,6 +22,7 @@ const CAPS = {
   'skills/epic/walk.md': 400,
   'skills/epic/retro.md': 400,
   'references/handback.md': 400,
+  'references/pace.md': 600,
   'references/epic-step.yml': 400,
 }
 
