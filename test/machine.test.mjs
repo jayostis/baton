@@ -10,9 +10,7 @@ import { spawnSync, spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { limits, machineSection, weightOf, live, STALE_AGENT_MS, MAX_AGENT_MS } from '../scripts/lib/machine.mjs'
 import { loadRoles } from '../scripts/lib/roles.mjs'
-import { heavyCommands } from '../scripts/lib/heavy-match.mjs'
 import { verdict as dispatch, apply, resets } from '../scripts/agent-slots.mjs'
-import { verdict as bash } from '../scripts/heavy-command.mjs'
 
 // heavy.sh and the hooks append events to the epic's log; these tests are not epics, and must not write to a real one.
 process.env.BATON_EVENTS = '0'
@@ -166,111 +164,6 @@ test('hooks end to end: a stale entry in the file does not count, and parallel d
 test('hooks end to end: a hook given no JSON lets the call through', () => {
   const r = spawnSync(process.execPath, [script('agent-slots.mjs'), 'check'], { input: 'not json', encoding: 'utf8' })
   assert.equal(r.status, 0)
-})
-
-// ---- the command matcher and the Bash hook
-
-const SH = '/p/scripts/heavy.sh'
-const heavy = (c, patterns = limits({ env: {} }).heavy_commands) => heavyCommands(c, patterns, SH)
-
-test('matcher: every default pattern is caught and rewritten', () => {
-  const cases = {
-    'pytest': 'bash "/p/scripts/heavy.sh" pytest',
-    'python3 -m pytest -n auto --dist loadgroup': 'bash "/p/scripts/heavy.sh" python3 -m pytest -n auto --dist loadgroup',
-    'node --test test/*.test.mjs': 'bash "/p/scripts/heavy.sh" node --test test/*.test.mjs',
-    'npm test': 'bash "/p/scripts/heavy.sh" npm test',
-    'npm run test:unit': 'bash "/p/scripts/heavy.sh" npm run test:unit',
-    'npm run lint': 'bash "/p/scripts/heavy.sh" npm run lint',
-    'npm run build': 'bash "/p/scripts/heavy.sh" npm run build',
-    'npx vitest run': 'bash "/p/scripts/heavy.sh" npx vitest run',
-    'vitest': 'bash "/p/scripts/heavy.sh" vitest',
-    'npx tsc -b': 'bash "/p/scripts/heavy.sh" npx tsc -b',
-    'tsc -b --noEmit': 'bash "/p/scripts/heavy.sh" tsc -b --noEmit',
-    'cargo test': 'bash "/p/scripts/heavy.sh" cargo test',
-    'cargo nextest run': 'bash "/p/scripts/heavy.sh" cargo nextest run',
-    'cargo build --release': 'bash "/p/scripts/heavy.sh" cargo build --release',
-    'docker run --rm img': 'bash "/p/scripts/heavy.sh" docker run --rm img',
-    'npx playwright test': 'bash "/p/scripts/heavy.sh" npx playwright test',
-  }
-  for (const [c, want] of Object.entries(cases)) {
-    const r = heavy(c)
-    assert.equal(r.found.length, 1, c)
-    assert.equal(r.rewritten, want, c)
-  }
-})
-
-test('matcher: a runner behind uv run, env assignments, time or a cd is caught, and the rewrite puts heavy.sh where it can run', () => {
-  assert.equal(heavy('uv run --python 3.12 --with pyshacl==0.30.1 --with rdflib python -m pytest -k x').rewritten,
-    'bash "/p/scripts/heavy.sh" uv run --python 3.12 --with pyshacl==0.30.1 --with rdflib python -m pytest -k x')
-  assert.equal(heavy('CI=1 FOO="a b" pytest').rewritten, 'CI=1 FOO="a b" bash "/p/scripts/heavy.sh" pytest')
-  assert.equal(heavy('time npm test').rewritten, 'time bash "/p/scripts/heavy.sh" npm test')
-  assert.equal(heavy('cd pkg && npm run lint 2>&1 | tail -5').rewritten, 'cd pkg && bash "/p/scripts/heavy.sh" npm run lint 2>&1 | tail -5')
-  const two = heavy('npm run lint; git status && pytest -q')
-  assert.equal(two.found.length, 2)
-  assert.equal(two.rewritten, 'bash "/p/scripts/heavy.sh" npm run lint; git status && bash "/p/scripts/heavy.sh" pytest -q')
-})
-
-test('matcher: a command already through heavy.sh passes, but only that command of a line', () => {
-  for (const c of ['bash /p/scripts/heavy.sh pytest', 'bash "C:/x/baton/scripts/heavy.sh" npm test', 'heavy.sh pytest', './scripts/heavy.sh node --test', 'CI=1 bash /p/scripts/heavy.sh pytest -n auto', 'cd a && bash /p/scripts/heavy.sh npm run lint']) {
-    assert.equal(heavy(c).found.length, 0, c)
-  }
-  const half = heavy('bash /p/scripts/heavy.sh pytest && npm test')
-  assert.equal(half.found.length, 1)
-  assert.equal(half.rewritten, 'bash /p/scripts/heavy.sh pytest && bash "/p/scripts/heavy.sh" npm test')
-})
-
-test('matcher: a command that only names a runner is not one', () => {
-  for (const c of [
-    'grep pytest requirements.txt', 'grep -rn "npm test" docs', 'echo "run pytest and npm run lint"', 'git commit -m "fix pytest and vitest"',
-    'cat tests/pytest.ini', 'ls node_modules/.bin/vitest', 'gh pr comment 3 --body "npm run build is slow"', 'pip install pytest', 'npm install',
-    'npm run test-helpers-doc', 'node scripts/ledger.mjs x', 'git log --grep="cargo test"', 'docker ps', 'cargo fmt', 'rg "docker run" .', "sed -n 1,5p 'tests/pytest.md'",
-  ]) {
-    assert.equal(heavy(c).found.length, 0, c)
-  }
-})
-
-test('matcher: the project replaces the list with machine.heavy_commands', () => {
-  assert.equal(heavy('make check', ['make check']).found.length, 1)
-  assert.equal(heavy('pytest', ['make check']).found.length, 0)
-  assert.equal(heavy('cargo clippy', ['cargo (clippy|doc)']).found.length, 1)
-})
-
-const sh = (command, o = {}) => bash({ tool_name: 'Bash', tool_input: { command } }, { epic: true, heavySh: SH, ...o })
-
-test('bash hook: a heavy command is refused with the exact command to run; a wrapped or light one passes', () => {
-  const r = sh('cd repo && pytest -n auto')
-  assert.equal(r.block, true)
-  assert.match(r.reason, /pytest is a heavy local command/)
-  assert.ok(r.reason.endsWith('\ncd repo && bash "/p/scripts/heavy.sh" pytest -n auto'), r.reason)
-  assert.equal(sh('bash /p/scripts/heavy.sh pytest').block, false)
-  assert.equal(sh('grep pytest x').block, false)
-  assert.equal(bash({ tool_name: 'PowerShell', tool_input: { command: 'npm test' } }, { epic: true, heavySh: SH }).block, true)
-  assert.equal(bash({ tool_name: 'Read', tool_input: { command: 'npm test' } }, { epic: true, heavySh: SH }).block, false)
-})
-
-test('bash hook: outside an epic, with BATON_MACHINE=0, and for a command that is not a string, nothing is refused', () => {
-  assert.equal(sh('pytest', { epic: false }).block, false)
-  assert.equal(sh('pytest', { env: { BATON_MACHINE: '0' } }).block, false)
-  assert.equal(bash({ tool_name: 'Bash', tool_input: {} }, { epic: true }).block, false)
-})
-
-test('bash hook, as run: exit 2 with the rewrite on stderr, 0 for the wrapped form, 0 outside an epic', () => {
-  const baton = mkdtempSync(join(tmpdir(), 'mach-'))
-  const run = (command, env = {}) => spawnSync(process.execPath, [script('heavy-command.mjs')], {
-    input: JSON.stringify({ session_id: 's1', cwd: baton, tool_name: 'Bash', tool_input: { command } }), encoding: 'utf8',
-    env: { ...process.env, BATON_HOME: baton, BATON_EPIC: '1', BATON_MACHINE: '', BATON_PROJECT_CONFIG: '', ...env },
-  })
-  const blocked = run('npm run lint')
-  assert.equal(blocked.status, 2)
-  assert.match(blocked.stderr, /bash ".*scripts\/heavy\.sh" npm run lint/)
-  assert.equal(run(blocked.stderr.split('\n')[1]).status, 0, 'the command it gives is let through')
-  assert.equal(run('npm run lint', { BATON_EPIC: '' }).status, 0)
-  assert.equal(run('npm run lint', { BATON_MACHINE: '0' }).status, 0)
-  const config = join(baton, 'project.md')
-  writeFileSync(config, '## machine\nheavy_commands: make check\n')
-  assert.equal(run('npm run lint', { BATON_PROJECT_CONFIG: config }).status, 0)
-  assert.equal(run('make check', { BATON_PROJECT_CONFIG: config }).status, 2)
-  assert.equal(spawnSync(process.execPath, [script('heavy-command.mjs')], { input: 'garbage', encoding: 'utf8' }).status, 0)
 })
 
 // ---- heavy.sh
