@@ -14,6 +14,9 @@ import { heavyCommands } from '../scripts/lib/heavy-match.mjs'
 import { verdict as dispatch, apply, resets } from '../scripts/agent-slots.mjs'
 import { verdict as bash } from '../scripts/heavy-command.mjs'
 
+// heavy.sh and the hooks append events to the epic's log; these tests are not epics, and must not write to a real one.
+process.env.BATON_EVENTS = '0'
+
 const script = (name) => fileURLToPath(new URL(`../scripts/${name}`, import.meta.url)).replace(/\\/g, '/')
 const GB = 2 ** 30
 const lim = (o = {}) => limits({ cpuCount: 8, memBytes: 16 * GB, env: {}, ...o })
