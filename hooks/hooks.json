@@ -34,6 +34,11 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-slots.mjs\" check",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/events-hook.mjs\" dispatch",
+            "timeout": 10
           }
         ]
       },
@@ -56,6 +61,11 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-slots.mjs\" bound",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/events-hook.mjs\" launched",
+            "timeout": 10
           }
         ]
       }
@@ -71,6 +81,11 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-slots.mjs\" stop",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/events-hook.mjs\" handback",
             "timeout": 10
           }
         ]

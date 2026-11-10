@@ -75,6 +75,14 @@
       "brief": "fix.md",
       "note": "always a fresh agent, at most 10 findings"
     },
+    "sharpen": {
+      "model": "sonnet",
+      "local": "heavy",
+      "effort": "high",
+      "unitTarget": 1200000,
+      "brief": "builder.md",
+      "note": "the one agent the cap hook lets past the caps (description key `sharpen:`): builds the tool or fixes the brief that the top sink of ledger.mjs --time points at; the target is a guess until a retro sets it"
+    },
     "mechanical": {
       "model": "haiku",
       "local": "heavy",

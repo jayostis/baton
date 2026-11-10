@@ -15,6 +15,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import { loadRoles } from './lib/roles.mjs'
+import { keyOf } from './lib/steps.mjs'
 import { inEpic } from './epic-mode.mjs'
 import { verdict as modelVerdict } from './require-model.mjs'
 import { limits, readMachineSection, machineOff, weightOf, statePath, updateState, writeState, live } from './lib/machine.mjs'
@@ -26,7 +27,10 @@ export function verdict(input, { env = process.env, epic = inEpic(input.session_
   if (input.tool_name !== 'Agent' || machineOff(env) || !epic) return { block: false }
   const description = String(input.tool_input?.description || '').trim()
   const weight = weightOf(description, roles)
-  const same = running.filter((a) => a.weight === weight)
+  const entry = { id: input.tool_use_id || null, agent_id: null, description: description || '(no description)', weight, at: now }
+  // One agent whose description key is `sharpen` runs past the caps, so the epic can always fix its own tooling; a second waits like any other.
+  if (keyOf(description) === 'sharpen' && !running.some((a) => a.sharpen)) return { block: false, entry: { ...entry, sharpen: true } }
+  const same = running.filter((a) => a.weight === weight && !a.sharpen)
   const cap = weight === 'heavy' ? lim.heavy_agents : lim.light_agents
   if (same.length >= cap) {
     const list = same.map((a) => `${a.description || a.id} (${minutes(now - a.at)})`).join('; ')
@@ -35,7 +39,7 @@ export function verdict(input, { env = process.env, epic = inEpic(input.session_
       reason: `Not dispatched: ${same.length} ${weight} agents are running and the cap is ${cap}, from the project config's machine section or this machine's ${lim.cpus} cpus and memory: ${list}. Wait for a handback, then dispatch.`,
     }
   }
-  return { block: false, entry: { id: input.tool_use_id || null, agent_id: null, description: description || '(no description)', weight, at: now } }
+  return { block: false, entry }
 }
 
 function agentIdOf(response) {
