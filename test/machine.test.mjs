@@ -117,3 +117,32 @@ bashIt('heavy.sh: a signal frees the slot and stops the command; BATON_MACHINE=0
   assert.equal(heavySh(d, ['echo', 'nested'], { BATON_HEAVY_HELD: '1', BATON_HEAVY_SLOTS: '1' }).stdout.trim(), 'nested')
   assert.equal(heavySh(d, []).status, 2)
 })
+
+bashIt('heavy.sh: a signal takes down the command and its grandchildren, and the slot is freed only once they are gone', () => {
+  const d = mkdtempSync(join(tmpdir(), 'heavy-')).replace(/\\/g, '/')
+  const marker = `${d}/survived.txt`
+  const r = spawnSync(BASH, ['-c', `bash "${script('heavy.sh')}" bash -c '(sleep 3; echo survived > "${marker}") & wait' & p=$!; sleep 1.5; ls "$BATON_HEAVY_DIR" | grep -c slot-; kill -TERM $p; wait $p; echo "rc=$?"; ls "$BATON_HEAVY_DIR" | grep -c slot-; sleep 3.5; test -e "${marker}" && echo SURVIVED || echo gone`], {
+    encoding: 'utf8', timeout: 20000, env: { ...process.env, BATON_HEAVY_DIR: d, BATON_HEAVY_SLOTS: '1', BATON_MACHINE: '', BATON_HEAVY_HELD: '', BATON_EVENTS: '0' },
+  })
+  assert.match(r.stdout, /^1\s+rc=143\s+0\s+gone\s*$/, r.stdout + r.stderr)
+})
+
+bashIt('heavy.sh: when the limits cannot be read it uses one slot and runs, never loops', () => {
+  const d = mkdtempSync(join(tmpdir(), 'heavy-'))
+  const r = heavySh(d, ['bash', '-c', 'echo ran'], { BATON_HEAVY_SLOTS: '', NODE_OPTIONS: '--import file:///no/such/module.mjs' }, { timeout: 15000 })
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(r.stdout.trim(), 'ran')
+  assert.deepEqual(readdirSync(d), [])
+})
+
+bashIt('heavy.sh: a reclaim lock left by a killed judge is taken over once it is a minute old, and the dead slot goes with it', () => {
+  const d = mkdtempSync(join(tmpdir(), 'heavy-'))
+  mkdirSync(join(d, 'slot-1')); writeFileSync(join(d, 'slot-1', 'pid'), deadPid())
+  mkdirSync(join(d, 'slot-1.reclaim'))
+  const old = new Date(Date.now() - 5 * 60 * 1000)
+  utimesSync(join(d, 'slot-1.reclaim'), old, old)
+  const r = heavySh(d, ['echo', 'ran'], { BATON_HEAVY_SLOTS: '1' }, { timeout: 15000 })
+  assert.equal(r.stdout.trim(), 'ran')
+  assert.doesNotMatch(r.stderr, /waiting/)
+  assert.deepEqual(readdirSync(d), [])
+})
