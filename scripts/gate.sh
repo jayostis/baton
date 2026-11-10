@@ -47,7 +47,12 @@ okstate=""; [ "$state" = "CLEAN" ] && okstate=1
 [ ${#allowed[@]} -gt 0 ] && [ "$state" = "UNSTABLE" ] && okstate=1
 if [ -n "$okstate" ] && [ -z "$pending" ] && [ -z "$unallowed" ] && [ "$threads" = "0" ]; then
   echo "GATE PASSES"
-  [ -n "$merge" ] && gh pr merge "$pr" -R "$repo" --merge && echo "merged" && ev merge repo="$repo" pr="$pr" head="$head"
+  if [ -n "$merge" ]; then
+    # A failed merge is not a merged one: gh's own message is on stderr, and the exit code says so.
+    gh pr merge "$pr" -R "$repo" --merge || { echo "MERGE FAILED: gh pr merge exited non-zero for $repo#$pr" >&2; exit 1; }
+    echo "merged"
+    ev merge repo="$repo" pr="$pr" head="$head"
+  fi
   exit 0
 fi
 echo "GATE DOES NOT PASS"
