@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { appendEvent, readEvents, scriptEventsPath, EVENTS_FILE, childSeconds, parsePairs, eventsPath } from '../scripts/lib/events.mjs'
-import { timeSplit, kindOf, transcriptMerges } from '../scripts/lib/timing.mjs'
+import { timeSplit, kindOf, extraHeavy, transcriptMerges } from '../scripts/lib/timing.mjs'
 import { timeReport } from '../scripts/lib/time-report.mjs'
 import { stepOf, reasonOf, reasonFromFindings } from '../scripts/lib/steps.mjs'
 import { ledger, pace, main as ledgerMain } from '../scripts/ledger.mjs'
@@ -365,4 +365,15 @@ bashIt('heavy.sh records the seconds it waited for a slot, as heavy-wait and on 
   assert.deepEqual(events.map((e) => e.kind), ['heavy-wait', 'heavy-start', 'heavy-end'])
   assert.ok(events.every((e) => e.wait_s >= 1), JSON.stringify(events.map((e) => e.wait_s)))
   await new Promise((r) => holder.on('close', r))
+})
+
+test('the time split\'s heavy list is extended from the project config\'s heavy_commands, for reporting only', () => {
+  const extra = extraHeavy('make check, cargo (clippy|doc)')
+  assert.equal(kindOf('Bash', { command: 'cd x && make check' }), 'other')
+  assert.equal(kindOf('Bash', { command: 'cd x && make check' }, extra), 'heavy')
+  assert.equal(kindOf('Bash', { command: 'cargo clippy --all' }, extra), 'heavy')
+  assert.equal(kindOf('Bash', { command: 'grep "make check" Makefile' }, extra), 'read')
+  assert.equal(kindOf('Bash', { command: 'pytest -q' }, extra), 'heavy', 'the built-in list stays')
+  assert.equal(extraHeavy(''), null)
+  assert.equal(extraHeavy('(unclosed'), null)
 })

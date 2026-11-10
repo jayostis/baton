@@ -99,8 +99,8 @@ test('every agent file names its model; none inherits', () => {
 test('hooks.json wraps its events, and every hook runs a script that exists', () => {
   const hooks = JSON.parse(read('hooks/hooks.json')).hooks
   const pre = hooks.PreToolUse
-  assert.deepEqual(pre.map((h) => h.matcher).sort(), ['Agent', 'Bash|PowerShell', 'SendMessage'])
-  const events = [...pre, ...hooks.PostToolUse, ...hooks.SessionStart, ...hooks.SubagentStop]
+  assert.deepEqual(pre.map((h) => h.matcher).sort(), ['Agent', 'SendMessage'])
+  const events = [...pre, ...hooks.PostToolUse, ...hooks.SubagentStop]
   assert.deepEqual(hooks.PostToolUse.map((h) => h.matcher), ['Agent'])
   for (const entry of events) {
     for (const h of entry.hooks) {

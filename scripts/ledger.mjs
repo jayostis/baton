@@ -31,7 +31,8 @@ import { homedir } from 'node:os'
 import { summarize, mainModel, instant } from './lib/transcript.mjs'
 import { loadRoles, units, show, familyOf } from './lib/roles.mjs'
 import { stepOf, reasonOf } from './lib/steps.mjs'
-import { timeSplit, transcriptMerges } from './lib/timing.mjs'
+import { timeSplit, transcriptMerges, extraHeavy } from './lib/timing.mjs'
+import { readMachineSection } from './lib/machine.mjs'
 import { timeReport } from './lib/time-report.mjs'
 import { readEvents, heavyFallbackPath, EVENTS_FILE } from './lib/events.mjs'
 
@@ -95,7 +96,7 @@ export function agentRow(s, { id, name, roles = loadRoles() }) {
 
 // With clip, turns outside [since, until) are not counted at all; without it an agent is in or out whole.
 // With time, each row also carries its transcript's time split and its subject line (for `--time`).
-export function ledger(dir, since, until, roles = loadRoles(), clip = false, { time = false } = {}) {
+export function ledger(dir, since, until, roles = loadRoles(), clip = false, { time = false, heavy = null } = {}) {
   const rows = []
   const main = join(dirname(dir), `${basename(dir)}.jsonl`)
   const files = existsSync(main) && statSync(main).isFile() ? [main, ...agents(dir)] : agents(dir)
@@ -109,7 +110,7 @@ export function ledger(dir, since, until, roles = loadRoles(), clip = false, { t
       name: path === main ? 'orchestrator' : describe(path, s),
       roles,
     })
-    if (time) Object.assign(row, { time: timeSplit(path), subject: s.prompt.split('\n')[0].trim() })
+    if (time) Object.assign(row, { time: timeSplit(path, heavy), subject: s.prompt.split('\n')[0].trim() })
     rows.push(row)
   }
   return rows.sort((a, b) => b.units - a.units)
@@ -221,6 +222,14 @@ export function rolePercentiles(rows, roles = loadRoles()) {
   }))
 }
 
+// The agents of one role that ran past twice that role's median minutes (the lower median, nearest rank).
+export function overruns(rows, role) {
+  const same = rows.filter((r) => String(r.agent).trim().split(/[s:]/)[0].toLowerCase() === role && r.minutes != null).sort((a, b) => a.minutes - b.minutes)
+  if (!same.length) return []
+  const median = same[Math.min(same.length - 1, Math.ceil(same.length / 2) - 1)].minutes
+  return same.filter((r) => r.minutes > 2 * median).map((r) => ({ agent: r.agent, id: r.id, minutes: r.minutes, median }))
+}
+
 // Per step: rounds (fix agents, plus cold reads after the first), and minutes from the first dispatch to the last
 // handback. Flags a step on two rounds or more, and a builder past twice the median minutes of the builders. Read from
 // the rows the ledger already has; nothing is measured that was not.
@@ -243,11 +252,7 @@ export function pace(rows) {
   for (const [reason, keys] of Object.entries(reasons)) {
     if (reason !== 'other' && keys.length >= 2) flags.push(`${reason}: ${keys.length} fix rounds (${keys.join(', ')}) for one reason, a tool or brief gap to build before the next agent of that role`)
   }
-  const builders = rows.filter((r) => word(r) === 'builder' && r.minutes != null).sort((a, b) => a.minutes - b.minutes)
-  if (builders.length) {
-    const median = builders[Math.min(builders.length - 1, Math.ceil(builders.length / 2) - 1)].minutes
-    for (const b of builders) if (b.minutes > 2 * median) flags.push(`${b.agent} (${b.id}): ${b.minutes} min, past twice the builder median of ${median}`)
-  }
+  for (const b of overruns(rows, 'builder')) flags.push(`${b.agent} (${b.id}): ${b.minutes} min, past twice the builder median of ${b.median}`)
   return { steps: out, flags, reasons: Object.fromEntries(Object.entries(reasons).map(([r, k]) => [r, k.length])) }
 }
 
@@ -352,7 +357,7 @@ export function main(args) {
   const since = wave ? wave.from : flag('--since')
   const until = wave ? wave.to : flag('--until')
   const clip = args.includes('--clip')
-  let rows = all ? allLedger(since, until, roles, clip) : projectDir ? projectLedger(projectDir, since, until, roles, clip) : ledger(target, since, until, roles, clip, { time: timed })
+  let rows = all ? allLedger(since, until, roles, clip) : projectDir ? projectLedger(projectDir, since, until, roles, clip) : ledger(target, since, until, roles, clip, { time: timed, heavy: timed ? extraHeavy(readMachineSection().heavy_commands) : null })
   if (wave) rows = rows.filter((r) => inWave(r, wave))
   if (flag('--agent')) {
     const line = agentLine(rows, flag('--agent'))

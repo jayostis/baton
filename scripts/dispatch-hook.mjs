@@ -6,7 +6,9 @@
 // the agents a restart killed have no `finished` either, so they count until their 90 quiet minutes are up.
 //
 // One agent whose description key is `sharpen` runs past the caps. The hook fails open: any error reading or parsing
-// lets the dispatch through and says so on stderr. It also refreshes the limits file heavy.sh reads.
+// lets the dispatch through and says so on stderr. It also refreshes the limits file heavy.sh reads, and when a pace flag
+// is up (scripts/lib/pace-warning.mjs) adds up to three lines of context for this dispatch: it warns, never blocks, and
+// says nothing when it cannot read the data.
 // BATON_MACHINE=0 turns it off. Exit 0 lets the call through; exit 2 blocks it and its stderr goes back as the reason.
 
 import { readFileSync } from 'node:fs'
@@ -14,6 +16,7 @@ import { basename } from 'node:path'
 import { loadRoles } from './lib/roles.mjs'
 import { keyOf } from './lib/steps.mjs'
 import { inEpic } from './epic-mode.mjs'
+import { paceWarning } from './lib/pace-warning.mjs'
 import { limits, readMachineSection, machineOff, weightOf, runningAgents, writeLimitsFile } from './lib/machine.mjs'
 
 const minutes = (ms) => `${Math.round(ms / 60000)} min`
@@ -48,4 +51,8 @@ if (process.argv[1] && basename(process.argv[1]) === 'dispatch-hook.mjs') {
   } catch (e) {
     console.error(`baton dispatch hook: ${e.message}; dispatch allowed`)
   }
+  try {
+    const lines = paceWarning(input)
+    if (lines.length) console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: lines.join('\n') } }))
+  } catch {}
 }

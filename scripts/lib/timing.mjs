@@ -10,17 +10,25 @@ const SHELLS = new Set(['Bash', 'PowerShell'])
 const READ_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'NotebookRead', 'WebFetch', 'WebSearch', 'ToolSearch'])
 const READ_COMMANDS = /^(cat|ls|head|tail|rg|grep|find|wc|sed|awk|stat|diff|jq|cd|echo|pwd|test|\[)(\s|$)/
 
-// Heavy is a test runner, a build or a docker run: a short pattern list of this report's own, not the project's machine
-// section. A `grep pytest` or an `echo` of one is not a run.
+// Heavy is a test runner, a build or a docker run: a short pattern list of this report's own, and for reporting only. A
+// project adds its runners with `heavy_commands` in its config's machine section (comma-separated patterns); nothing is
+// enforced from them. A `grep pytest` or an `echo` of one is not a run.
 const HEAVY = /(^|\s)(heavy\.sh|pytest|vitest|node\s[^|;&]*--test|npm\s+(run\s+)?(test|build|lint)|npx\s+(vitest|tsc)|tsc\s+-b|cargo\s+(test|nextest|build)|docker\s+run|playwright)(\s|$)/
+
+// The project's `heavy_commands` as a pattern for kindOf, or null when it names none or one is not a pattern.
+export function extraHeavy(list) {
+  const parts = String(list ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (!parts.length) return null
+  try { return new RegExp(`(^|\\s)(${parts.join('|')})(\\s|$)`) } catch { return null }
+}
 
 // The kind of a tool call, first match wins: heavy, CI wait, git or gh, read or search, other. A command that sleeps in a
 // loop is waiting on a background job: CI if it names gh or wait-ci.sh, else the heavy run it waits for.
-export function kindOf(tool, input) {
+export function kindOf(tool, input, extra = null) {
   if (!SHELLS.has(tool)) return READ_TOOLS.has(tool) ? 'read' : 'other'
   const cmd = typeof input?.command === 'string' ? input.command : ''
   const parts = cmd.split(/&&|\|\||;|\||\n/).map((s) => s.trim()).filter(Boolean)
-  if (parts.some((s) => !/^(grep|rg|cat|echo|head|tail)\s/.test(s) && HEAVY.test(s))) return 'heavy'
+  if (parts.some((s) => !/^(grep|rg|cat|echo|head|tail)\s/.test(s) && (HEAVY.test(s) || extra?.test(s)))) return 'heavy'
   const sleeps = /(^|[\s;&|])sleep\s+\d/.test(cmd)
   if (/wait-ci\.sh|gh\s+run\s+watch|--watch\b/.test(cmd) || (sleeps && /(^|\s)gh\s/.test(cmd))) return 'ci'
   if (sleeps) return 'heavy'
@@ -34,7 +42,7 @@ const textOf = (input) => String(input?.command ?? input?.file_path ?? input?.pa
 // Wall, tool and model milliseconds, tool milliseconds by kind, the five longest calls, and every call (for joining an
 // event to the agent that made it). Tool time is the union of the calls' intervals, so parallel calls are not counted
 // twice; the kinds are scaled to sum to it.
-export function timeSplit(path) {
+export function timeSplit(path, extra = null) {
   if (!existsSync(path)) return null
   const open = new Map()
   const calls = []
@@ -55,7 +63,7 @@ export function timeSplit(path) {
         const call = c.type === 'tool_result' && open.get(c.tool_use_id)
         if (!call) continue
         open.delete(c.tool_use_id)
-        calls.push({ tool: call.tool, text: textOf(call.input).slice(0, 400), kind: kindOf(call.tool, call.input), start: call.start, end: Math.max(at, call.start) })
+        calls.push({ tool: call.tool, text: textOf(call.input).slice(0, 400), kind: kindOf(call.tool, call.input, extra), start: call.start, end: Math.max(at, call.start) })
       }
     }
   }
