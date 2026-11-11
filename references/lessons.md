@@ -6,6 +6,7 @@
 [all] Scratch repros go under a short path in Temp; a long scratchpad path broke tests three times.
 [all] Never git stash, and never git checkout a ref in a main clone (it left one on a detached HEAD); read another ref with git show <ref>:<path>.
 [all] On Windows the Bash tool halves a doubled backslash even inside single quotes (printf '%s' 'a\\b' prints a\b), and source files may be CRLF on disk so scripted string edits miss: write files and code with Edit and Write, never a heredoc, sed or node -e (three fix rounds in one epic, three wrecked edits in the next).
+[all] Bring a branch up to date by merging its base, never by rebase and force-push: auto mode refused a dispatch that asked for one.
 [all] Only one Docker run at a time, behind the project's lock; never remove a lock you did not take (three OOM kills, one stolen timing lock).
 [all] A background command wakes you only after your turn ends; do not start one you need before reporting, and stop every one you started before handing back (a builder re-sent its handback three times at 470k context as its runs ended).
 [orchestrator] Never resume a finished agent: five Opus builders resumed 4-9 times were 852M of 1,122M cache reads, and a fresh fix agent cost 58k against 208k for the author.
@@ -21,15 +22,17 @@
 [orchestrator] The maintainer's own session with what shipped is a walk; schedule it before calling a phase done (thirty minutes found seven defects, one of them the contract failing live).
 [orchestrator] One agent per branch at a time: a second review or a CI red for a branch whose fixer is still running goes to that fixer by SendMessage.
 [orchestrator] A findings file quotes the reviewer and any ruling it touches, and names the targeted test command as the repo really runs it; a paraphrase naming one of two commands (rt#589) and an "or otherwise" against a ruling (rt#576) each cost a round, and three fix agents in one epic were handed the wrong runner or the full suite.
-[orchestrator] A handoff logged yes ends the session: tell the maintainer and dispatch nothing more, and the next session's id in run.md is the witness; three yes decisions in one epic were each followed by more turns in the same transcript, which reached 716 turns, a 428k peak and 22.7M units.
+[orchestrator] A handoff logged yes ends the session: tell the maintainer and dispatch nothing more, and the next session's id in run.md is the witness; three yes decisions in one epic were each followed by more turns in the same transcript, which reached 716 turns, a 428k peak and 22.7M units. Paste the handoff-decision line --self prints, verbatim: a hand-written one (short session id, no predicted_units) read back as NaN and "handed off no".
 [orchestrator] Split a very large diff's review by concern, one reviewer each.
 [orchestrator] Reviewers found something on nearly every PR; skipping one is logged in the status line, never silent.
 [orchestrator] Name the code path that shows a behaviour before dispatching its fix; a lean has assumed what the engine could not do.
 [orchestrator] Advise a handoff only from ledger.mjs --self at a wave boundary; a compaction summary written at 614k context had the orchestrator urge a fresh session at 182k.
-[orchestrator] Before redispatching an agent you think is dead, check that its transcript has stopped growing and what its branch holds on the remote; a live Opus builder was duplicated.
+[orchestrator] Before redispatching an agent you think is dead, check that its transcript has stopped growing and what its branch holds on the remote and in its worktree; a live Opus builder was duplicated, and two builders taken for lost had left their work in both.
 [orchestrator] A Workflow gives each agent the user's triggering message as its first turn; never use one for an agent whose prompt must be only its brief (an eval subject obeyed the relayed message).
 [orchestrator] A usage-limit stop kills every agent; only pushed work survives, so tell builders to push early.
-[orchestrator] Cite files and symbols in step files, not line numbers; they went stale within a wave.
+[orchestrator] Cite files, symbols and tests by name in step files and briefs, and a page's slot by its row text, never by line number; line numbers went stale within a wave.
+[orchestrator] Size authoring before dispatch: split at about 3k test lines per author and any file over about 1.5k lines. Fable authors were 211M of epic-tests-as-spec's 457M units (39 agents, median 4.8M, max 16.8M), and seven ran to 167k-295k context.
+[orchestrator] Close each wave with its own "to" when its last PR merges; w0-w4 closed at one instant made the ledger give w2, w3 and w4 the same 122.8M.
 [orchestrator] Put each recurring must-fix class in the next step file as an acceptance check.
 [orchestrator] Sharpen during the epic, not at the retro: apply each handback's proposed change that saves a round or a wait, and build the tool or fix the brief on a second round for one reason (a cold-read words loop ran three rounds on each of three PRs; a wrong review-wt.sh call was repeated in several prompts; builders' tool asks were logged "for the retro").
 [orchestrator] 20 agents with four or five local test suites locked a 4-core machine into a restart (2026-11-10); the cap is a dispatch hook sized by the machine, heavy and light apart, and heavy.sh holds local suites to its slots.
@@ -52,11 +55,13 @@
 [reviewer] Re-review in the same standing worktree (seconds, against 5-8 minutes for a fresh one): read the diff since the last review and rerun the old repros.
 [reviewer] Where the PR's claim is a count, independently recompute it from the primary files; three such recomputations found gaps.
 [reviewer] A PR that hands a change list downstream proves it by applying the list in a scratch worktree.
+[reviewer] Run a proposed config or lint change before listing it; a ruff nit that was never run was wrong.
 [reviewer] A pin bump is checked against the registry's publish date, at least 14 days old.
 [reviewer] A GitHub workflow step with `shell: bash` runs `bash -e`, so a command that may exit non-zero needs `|| true`; a review that assumed otherwise passed a step that turned main red. Under `pipefail`, a reader that stops early (`awk ... exit`, `head`) gives its writer SIGPIPE and ends the step: probe a job a PR's CI never runs (schedule or dispatch only) with a stub, as a reviewer did with 170KB of stderr.
 [fix] A fix agent that was handed ten or fewer findings and no history got every one right; more than ten overran.
 [fix] Reply to a thread after fixing, resolve only after the push; a resolution is a claim the fix is on the head.
 [fix] Run verify_command and the typecheck (`tsc -b`) before committing; a fix round's new test that was never typechecked turned a PR red, and resetting a pushed commit needs a force push, which is denied.
+[fix] Without the repo's toolchain, never assert text you inferred: read the expected text from a CI log or a sibling test first (bridge-rs#146 went red on a guessed message).
 [mechanical] Do not repair or retry a failed command; a half-fix pushed over a red build is worse than the red build.
 [walk] Walking the shipped thing found what tests did not in six epics, once 507 records written to the wrong destination.
 [walk] Save evidence under a path with no spaces; a space breaks the clickable link to it.
