@@ -8,7 +8,7 @@
 //   ---
 //   1. <subject>   2. <brief>   3. <input file>   4. <plugin root>   5. <project config>
 //
-// The brief is the role's, from the role table; --brief names one for a role the table has none for (author, checker,
+// The brief is the role's, from the role table; --brief names one for a role the table has none for (such as
 // cold-read). A cold-read prompt leaves lines 4 and 5 blank: the reader opens nothing but the page. A review role gets one
 // more line, `review_worktree:`, copied from the project config's `## review_worktree` entry (its first indented command),
 // with `--slot <n>` where the config has `[--slot <n>]`; the repo and ref placeholders it names are the orchestrator's to
