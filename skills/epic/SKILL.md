@@ -80,7 +80,7 @@ puts in the description. More than ten findings: split into two agents. It posts
 a branch whose fixer is still running goes to that fixer by `SendMessage`. Never `/baton:pr loop` in an epic.
 
 **Merge.** Only through `bash ${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh <owner/repo> <pr> [--merge] [--allow <check>]...`,
-only after the maintainer has said in chat that you may, the date recorded in `HANDOFF.md`. The gate reads state
+once reviewed and green. Running the epic is merge permission; never ask, unless the maintainer withdrew it. The gate reads state
 itself (mergeability, checks on the current head, threads), never a review: confirm the PR's head is the one reviewed
 (or a fix round's push the review covered). `--allow` is only for a check a Depends-On partner's PR turns green, which
 the PR body names. No `--admin`. Pairs merge back to back.
