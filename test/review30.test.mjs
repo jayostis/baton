@@ -211,6 +211,16 @@ test('nit: briefs run scripts by ${CLAUDE_PLUGIN_ROOT}, and no public file names
   }
 })
 
+test('baton is general: no shipped file names a project, its domain or its people', () => {
+  const project = /cascade|\bpods?\b|vocabular|bridge|adapter|fhir|ccda|sparql|shacl|\bIRI\b|CURIE|starter-kit|care-gaps|find-your-way|tests-as-spec|epic-alpha|\bJay\b|\brt#|\bvocab#|C:[/\\]dev/i
+  const shipped = spawnSync('git', ['ls-files', 'references', 'skills', 'scripts', 'hooks', 'agents', 'CLAUDE.md', 'README.md'], { cwd: root, encoding: 'utf8' })
+    .stdout.split('\n').filter(Boolean)
+  assert.ok(shipped.length > 20, 'git ls-files listed the shipped files')
+  for (const f of shipped) {
+    read(f).split('\n').forEach((line, i) => assert.doesNotMatch(line, project, `${f}:${i + 1}`))
+  }
+})
+
 test('nit: threads list logs counts, not thread bodies; comments.md shows the thread URL', () => {
   const src = read('scripts/threads.mjs')
   assert.doesNotMatch(src, /appendRun\('threads', d\.repo, \{ cmd: o\.cmd, \.\.\.d,/)

@@ -1,5 +1,5 @@
 // What the machine can carry, and which agents count against it. An agent's cost to the machine depends on what it runs,
-// not on how many agents there are: authors, reviewers and readers wait on the model, builders and fixers run builds and
+// not on how many agents there are: reviewers and readers wait on the model, builders and fixers run builds and
 // tests. So the limits are two caps on agents by weight (references/roles.json, each role's `local`) and a number of
 // slots for the heavy local commands (scripts/heavy.sh). The project config's `machine` section sets them; without it
 // they come from this machine's cpus and memory.
@@ -54,7 +54,7 @@ export function limits({ config = {}, env = process.env, cpuCount = cpus().lengt
 export const machineOff = (env = process.env) => env.BATON_MACHINE === '0'
 
 // Heavy or light, by the first word of a dispatch description ("fix: w3 s07b round 2"): the role table's `local`, else
-// defaultLocal for keys the table lacks (author, checker, cold-read, retro), else light.
+// defaultLocal for keys the table lacks (cold-read, retro), else light.
 export function weightOf(description, roles = loadRoles()) {
   const word = String(description || '').trim().split(/[\s:]/)[0].toLowerCase()
   const role = Object.hasOwn(roles.roles, word) ? roles.roles[word].local : roles.defaultLocal?.[word]
