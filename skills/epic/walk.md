@@ -6,6 +6,8 @@ walks of earlier epics found. Prompt lines: 1 the epic, 2 this file, 4 the plugi
 
 - Be alone on the machine: no other agent is running. The orchestrator guarantees it; if you see one, stop.
 - Start from a clean checkout of each merged branch, built the way a user builds it. Not your worktree.
+- Use the build each repo is pinned to and the test data (accounts, sample people) that the prompt names; the
+  orchestrator names both, so the walk does not spend its first minutes finding them.
 - Drive the real surface: the UI in a browser, the CLI in a shell, the API with real requests, on real or
   realistic data. For each issue, do its "Done when" first, then what a user would do next.
 - Save a screenshot or output for every finding, under the path the prompt names (no spaces in the path).
