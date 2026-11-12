@@ -8,6 +8,7 @@ Every epic agent ends its report with exactly this block, after its role's repor
 - waits: <each time you waited on something: what, how long, or "none">
 - cost a round: <what made a second round or a retry necessary, or "none">
 - change: <the one change to the brief, a tool or the step file that would have saved the most, or "none">
+- background: <each background command you started, and that it is stopped, or "none">
 ```
 
 The ledger's line has the agent, model, turns, peak context, cost units and minutes. An agent has no way to read its
