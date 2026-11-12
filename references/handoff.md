@@ -7,7 +7,7 @@ and `run.md`, so write what it cannot get from GitHub.
 # <epic> handoff, <date and time>
 
 ## Authority
-- Merge permission: granted by <maintainer> in chat on <date>, scope <what>. (Auto mode refuses without it.)
+- Merge permission: standing, by running the epic (SKILL, Merge), unless withdrawn in chat on <date>.
 - Stop line: <from the project config>
 
 ## Waves
