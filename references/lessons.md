@@ -39,6 +39,10 @@
 [orchestrator] Put each recurring must-fix class in the next step file as an acceptance check.
 [orchestrator] Sharpen during the epic, not at the retro: apply each handback's proposed change that saves a round or a wait, and build the tool or fix the brief on a second round for one reason (a cold-read words loop ran three rounds on each of three PRs; a wrong review-wt.sh call was repeated in several prompts; builders' tool asks were logged "for the retro").
 [orchestrator] 20 agents with four or five local test suites locked a 4-core machine into a restart (2026-11-10); the cap is a dispatch hook sized by the machine, heavy and light apart, and heavy.sh holds local suites to its slots.
+[orchestrator] Split a step that holds a new format, its migration and its concurrent writers into one step each: one Opus builder took 12.2M units at a 439k peak, and its PR then needed three fix rounds (6.6M) for blockers in the migration and the writers.
+[orchestrator] A pair whose consumer pins the producer's build merges as three PRs: the producer, the consumer, then the consumer's pin bump, planned from the start; a kit main went red on merge because its template still pinned the previous build.
+[orchestrator] A bench that proves a budget runs on a quiet machine, run by you, at a size chosen from a measured growth curve: a 2,000-resource bench on a superlinear import took 45 minutes and was killed twice for low memory. Before calling a budget missed, check both sides of each subtraction are measured in the same state: an Argon2 worker warm on one side and cold on the other read as +65 ms of open cost, against a real +18 ms.
+[orchestrator] Rerun only the newest CI run of each workflow: a rerun of a stale run cancelled the current one through the workflow's concurrency group.
 [critical-read] Reading all steps together found 15 must-fixes in one epic and must-fixes in every other; per-step grooming did not.
 [critical-read] A step that rests on an unmeasured number is a step 0: one spike cancelled a step worth 71k tokens and 4 minutes.
 [critical-read] Set up the local fast loop first; a host runner removed Docker from the loop and made each check six times faster.
@@ -54,6 +58,7 @@
 [builder] Merge origin/main before pushing and run verify_command after the merge; the old merge ref is reused otherwise.
 [builder] Another repo's stale sibling checkout gave 13 phantom failures; check it is current before trusting a local failure.
 [builder] Check every identifier, URL and code you quote at its source: one of twelve URLs was dead and a suggested code named something else.
+[builder] A race probe runs two processes, never two calls in one, and a migration proves every kind of write it needs before its point of no return: an in-process lock hid a compare-and-swap that was not atomic across processes, and a write that failed after the new header left the stored data unreadable by either version (three blockers and a fix round on one PR).
 [reviewer] Probes, adversarial inputs, primary sources and downstream readers found the defects; broad mutation sweeps found nothing. A change that writes state another layer owns gets a close-and-reopen probe: one found a rename the layer below rebuilt on the next open.
 [reviewer] A blocker costs the builder 30 minutes to 2 hours; give the input that shows it so nobody rediscovers it.
 [reviewer] Re-review in the same standing worktree (seconds, against 5-8 minutes for a fresh one): read the diff since the last review and rerun the old repros.
