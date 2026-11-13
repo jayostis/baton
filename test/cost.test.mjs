@@ -234,6 +234,11 @@ test('selfLine reads the last context, not the peak, and hands off when the last
   assert.equal(none.handOff, null)
   assert.match(none.line, /--waves/)
   assert.equal(selfLine(join(project, 'absent'), waves, R(1)), null)
+  const opened = { ...waves, w2: { from: '2026-10-30T11:00:00Z' } }
+  assert.match(selfLine(dir, opened, R(144_000)).line, /Wave w1: 3 turns/, 'a wave opened before --self ran is not the estimate')
+  const past = selfLine(dir, waves, { ...R(10 ** 9), ceilingTokens: 150_000 })
+  assert.equal(past.handOff, true)
+  assert.match(past.line, /past twice the 150k ceiling/)
 })
 
 test('allLedger reads every project folder, and with clip counts only the turns inside the window', () => {

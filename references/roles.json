@@ -2,11 +2,11 @@
   "version": 1,
   "calibration": {
     "unitsPerPercentOfWeek": 9990000,
-    "note": "Checked 2026-11-11T17:08Z: the meter read 55% against 556.8M units in the same window, 9.94M-10.12M per percent, which holds 9.99M, so kept. Weights checked against session da10d59e's dollars: sonnet (52.4M cache read, 1.4M write, 311k output) gives $11.85 against $11.95; opus (53.1M read, 623k write, 196k output) gives $17.74 at 1.25x writes and $19.61 at 2x against $18.42; not changed. Reset 2026-11-11: the meter read 50% at 2026-11-11T01:13Z in the week that reset 2026-11-06T21:00Z, against 499.5M units on the machine's transcripts cut to the window (ledger.mjs --all --since <reset> --until <reading> --clip), so 9.99M per percent. A whole-percent reading of 50 spans 9.89M-10.09M, which excludes the previous 9.8M; the same week's earlier reading (11% at 107.6M, 8.97M-10.25M) agrees. Weights checked against one session's dollars at list prices: sonnet (2.4M cache read, 95.5k write, 17.1k output) gives $0.65 against $0.65; opus (2.5M read, 59.9k write, 12.9k output) gives $1.06 at 1.25x writes and $1.24 at 2x against $1.23, so the orchestrator's writes are 1-hour cache writes. Weights not changed: the gap is the orchestrator's alone, about 15% of its units. Earlier readings gave 10.1M (2026-11-03), 10.36M (2026-11-06) and 9.78M (2026-11-10). The meter also counts requests no transcript holds, so this ratio absorbs them. Recalibrate at each retro from a fresh reading."
+    "note": "Kept 2026-11-13: the reading after a 104M-unit epic showed 0%, because the week had reset; a reset reading gives no ratio, so 9.99M stands until the next reading inside one week. Checked 2026-11-11T17:08Z: the meter read 55% against 556.8M units in the same window, 9.94M-10.12M per percent, which holds 9.99M, so kept. Weights checked against session da10d59e's dollars: sonnet (52.4M cache read, 1.4M write, 311k output) gives $11.85 against $11.95; opus (53.1M read, 623k write, 196k output) gives $17.74 at 1.25x writes and $19.61 at 2x against $18.42; not changed. Reset 2026-11-11: the meter read 50% at 2026-11-11T01:13Z in the week that reset 2026-11-06T21:00Z, against 499.5M units on the machine's transcripts cut to the window (ledger.mjs --all --since <reset> --until <reading> --clip), so 9.99M per percent. A whole-percent reading of 50 spans 9.89M-10.09M, which excludes the previous 9.8M; the same week's earlier reading (11% at 107.6M, 8.97M-10.25M) agrees. Weights checked against one session's dollars at list prices: sonnet (2.4M cache read, 95.5k write, 17.1k output) gives $0.65 against $0.65; opus (2.5M read, 59.9k write, 12.9k output) gives $1.06 at 1.25x writes and $1.24 at 2x against $1.23, so the orchestrator's writes are 1-hour cache writes. Weights not changed: the gap is the orchestrator's alone, about 15% of its units. Earlier readings gave 10.1M (2026-11-03), 10.36M (2026-11-06) and 9.78M (2026-11-10). The meter also counts requests no transcript holds, so this ratio absorbs them. Recalibrate at each retro from a fresh reading."
   },
   "unit": "one uncached sonnet input token",
   "weights": {
-    "note": "Set 2026-11-03 from list prices (opus-5-5 $4/$20, sonnet-5-5 $2/$10, haiku-5-5 $0.10/$0.50, fable-5-1 $10/$50 per million input/output) and checked against the meter's dollars for session 28675dc0: its sonnet line (409.7M cache read, 8.2M cache write, 2.2M output, $83.46) fits only with cache reads at 0.05x of input and writes at 1.25x, and its opus line at those ratios gives $186 against $191.53. Fable's cache reads are 0.025x of its input, so its units overstate them twice over. Haiku prompts past 100k tokens cost 5x, which haiku 0.05 does not show.",
+    "note": "fable 5 -> 4 on 2026-11-13: the agents run fable-5-2 ($8/$40, cache reads $0.20), not fable-5-1 ($10/$50). Its session line (402 input, 373.2k output, 24.9M cache read, 1.1M cache write) is $30.91 at list prices against $31.19 on the meter; its units at 5 put it at $44.86 and at 4 at $35.89, the rest being its cache reads at 0.025x of input. The same session checks the others: sonnet (36.6M read, 1.4M write, 346.7k output) $10.63 against $10.60; haiku $0.090 against $0.090; opus (132.7M read, 984k write, 222k output) $35.99 at 1.25x writes and $38.94 at 2x against $37.89, the orchestrator's 1-hour writes; not changed. Set 2026-11-03 from list prices (opus-5-5 $4/$20, sonnet-5-5 $2/$10, haiku-5-5 $0.10/$0.50, fable-5-1 $10/$50 per million input/output) and checked against the meter's dollars for session 28675dc0: its sonnet line (409.7M cache read, 8.2M cache write, 2.2M output, $83.46) fits only with cache reads at 0.05x of input and writes at 1.25x, and its opus line at those ratios gives $186 against $191.53. Fable's cache reads are 0.025x of its input, so its units overstate them twice over. Haiku prompts past 100k tokens cost 5x, which haiku 0.05 does not show.",
     "kinds": {
       "input": 1,
       "cacheWrite": 1.25,
@@ -17,7 +17,7 @@
       "opus": 2,
       "sonnet": 1,
       "haiku": 0.05,
-      "fable": 5,
+      "fable": 4,
       "unknown": 2
     }
   },
@@ -25,10 +25,10 @@
   "handoff": {
     "freshSessionTokens": 135000,
     "minimumUnitsSaved": 2500000,
-    "note": "ledger.mjs --self --waves <file>, at a wave boundary only: the orchestrator's last context minus a fresh session's, times the last wave's turns, as cache reads. Each decision is logged in run.md as the handoff-decision line that --self prints; the retro reads them back with ledger.mjs --handoffs <run.md> --next <the next session-dir> and recalibrates. freshSessionTokens: resumed sessions averaged 72k, 135k, 193k, 73k and 153k context over their first turns; 135k, the median, kept. minimumUnitsSaved (a quarter of a percent of the week) kept: the two logged yes decisions predicted 15.7M and 19.1M saved and the next sessions showed 13.6M and 10.0M, so the prediction runs up to 1.9x high but both cleared the threshold four times over."
+    "note": "2026-11-13: --self now reads the last closed wave's turns (twice it was run after the next wave opened and read 0 turns) and says yes past twice ceilingTokens: at 400k it said no on a 60-turn estimate, the next wave ran 196 turns at a 522k mean context to a 664k peak, and a fresh session would have saved about 7.6M units, three times the threshold. No yes was logged, so freshSessionTokens and minimumUnitsSaved have no new check and are kept. ledger.mjs --self --waves <file>, at a wave boundary only: the orchestrator's last context minus a fresh session's, times the last wave's turns, as cache reads. Each decision is logged in run.md as the handoff-decision line that --self prints; the retro reads them back with ledger.mjs --handoffs <run.md> --next <the next session-dir> and recalibrates. freshSessionTokens: resumed sessions averaged 72k, 135k, 193k, 73k and 153k context over their first turns; 135k, the median, kept. minimumUnitsSaved (a quarter of a percent of the week) kept: the two logged yes decisions predicted 15.7M and 19.1M saved and the next sessions showed 13.6M and 10.0M, so the prediction runs up to 1.9x high but both cleared the threshold four times over."
   },
   "waveBudgetUnits": null,
-  "unitTargetNote": "Yardsticks, not caps: no agent can see its own usage, so a target changes nothing while the agent runs. The ledger flags an agent past its target for the retro to explain. A retro resets each target to the role's p90 by model (ledger.mjs <session-dir> --percentiles), unless the epic was an outlier in units per PR, when a target is kept so the next epic's warnings still fire. Reset 2026-11-11: fix sonnet n 40, p90 0.70M and 0.64M in two sessions; review-new-logic opus n 12, p90 1.4M. Kept: builder sonnet (n 40, p90 3.5M, in an epic at 2.3x the highest earlier units per PR), builder opus (n 1), review-small (n 31, p90 0.18M), sharpen (n 3), critical read, walk, mechanical and orchestrator. Checked 2026-11-11 after an epic at 1.7M units per PR, the lowest in the history: builder sonnet n 7, p90 1.1M, equals its target; fix sonnet (n 6, p90 0.48M), review-small (n 6, 0.10M), review-new-logic opus (n 3, 0.66M) and walk (n 1, 0.74M) came in under target in a low outlier, so every target kept. Checked 2026-11-13 after an epic at 7.2M agent units per merged PR (50.7M over 7; a high outlier, second in the history): builder sonnet n 6, p90 3.6M; fix sonnet n 6, p90 1.2M; review-small n 6, p90 0.33M; review-new-logic opus n 6, p90 2.5M; builder opus n 1, 12.2M; fix opus n 1, 4.5M; walk n 1, 0.98M. Every target kept, as the outlier rule says: the overruns were one oversized step (a format, its migration and its writers in one builder), not the targets.",
+  "unitTargetNote": "Reset 2026-11-13 after an epic at 3.7M agent and orchestrator units per merged PR (103.8M over 28; inside the history's range): builder sonnet n 21, p90 1.2M; fix sonnet n 23, p90 0.68M; review-small sonnet n 24, p90 0.24M; review-new-logic opus n 5, p90 1.9M; critical-read opus n 3, p90 1.8M. Kept: walk (n 1, 0.25M), orchestrator (n 1, 29.2M), builder opus (n 0). Yardsticks, not caps: no agent can see its own usage, so a target changes nothing while the agent runs. The ledger flags an agent past its target for the retro to explain. A retro resets each target to the role's p90 by model (ledger.mjs <session-dir> --percentiles), unless the epic was an outlier in units per PR, when a target is kept so the next epic's warnings still fire. Reset 2026-11-11: fix sonnet n 40, p90 0.70M and 0.64M in two sessions; review-new-logic opus n 12, p90 1.4M. Kept: builder sonnet (n 40, p90 3.5M, in an epic at 2.3x the highest earlier units per PR), builder opus (n 1), review-small (n 31, p90 0.18M), sharpen (n 3), critical read, walk, mechanical and orchestrator. Checked 2026-11-11 after an epic at 1.7M units per PR, the lowest in the history: builder sonnet n 7, p90 1.1M, equals its target; fix sonnet (n 6, p90 0.48M), review-small (n 6, 0.10M), review-new-logic opus (n 3, 0.66M) and walk (n 1, 0.74M) came in under target in a low outlier, so every target kept. Checked 2026-11-13 after an epic at 7.2M agent units per merged PR (50.7M over 7; a high outlier, second in the history): builder sonnet n 6, p90 3.6M; fix sonnet n 6, p90 1.2M; review-small n 6, p90 0.33M; review-new-logic opus n 6, p90 2.5M; builder opus n 1, 12.2M; fix opus n 1, 4.5M; walk n 1, 0.98M. Every target kept, as the outlier rule says: the overruns were one oversized step (a format, its migration and its writers in one builder), not the targets.",
   "defaultLocal": {
     "note": "What a description key the table lacks costs the machine: heavy roles run builds and tests, light roles read files and wait on the model. scripts/lib/machine.mjs reads this and each role's local; an unknown key counts light.",
     "cold-read": "light",
@@ -39,14 +39,14 @@
       "model": "opus",
       "local": "light",
       "effort": "high",
-      "unitTarget": 3000000,
+      "unitTarget": 1800000,
       "brief": "critical-read.md"
     },
     "builder": {
       "model": "sonnet",
       "local": "heavy",
       "effort": "high",
-      "unitTarget": 1100000,
+      "unitTarget": 1200000,
       "unitTargetByModel": {
         "opus": 3500000
       },
@@ -57,21 +57,21 @@
       "model": "opus",
       "local": "light",
       "effort": "medium",
-      "unitTarget": 1400000,
+      "unitTarget": 1900000,
       "brief": "reviewer.md"
     },
     "review-small": {
       "model": "sonnet",
       "local": "light",
       "effort": "medium",
-      "unitTarget": 200000,
+      "unitTarget": 240000,
       "brief": "reviewer.md"
     },
     "fix": {
       "model": "sonnet",
       "local": "heavy",
       "effort": "medium",
-      "unitTarget": 670000,
+      "unitTarget": 680000,
       "brief": "fix.md",
       "note": "always a fresh agent, at most 10 findings"
     },
