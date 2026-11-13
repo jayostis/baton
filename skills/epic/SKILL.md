@@ -32,7 +32,8 @@ your impression of the spend.
 
 **Plan.** One issue per step, from `${CLAUDE_PLUGIN_ROOT}/references/epic-step.yml`: problem, in and out of scope,
 the check that goes red first, files by name, settled sections cited. Fallout from a settled ruling is applied and
-said in one line, never raised again.
+said in one line, never raised again. A page or copy step starts from a story and audience the maintainer approved as
+plain text.
 
 **One critical read** before anything is built: the `critical-read` role, brief `critical-read.md`, over all the steps
 together against the code. Apply its must-fixes to the issues. It also assigns each step a role and a wave. Steps that
@@ -41,8 +42,7 @@ want a design call get Opus; nothing else does.
 **Waves.** Agents at once are capped by weight, heavy (builders, fixers) and light (readers, reviewers), from the
 project config's `machine` section else this machine (`node "${CLAUDE_PLUGIN_ROOT}/scripts/machine.mjs"` prints the caps).
 The dispatch hook enforces the cap by weight: wait for a handback. It also adds the pace flags to a dispatch as context; act on them before that dispatch. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/heavy.sh" <command>`
-is the recommended way to run a local suite, in the Bash tool with `timeout: 600000` (it is bash: PowerShell users go
-through that tool), on the changed files only; CI runs the full suite, the seeds and coverage. One at a time for anything that takes the Docker lock or times a run. Before a wave starts, add it to `waves.json`
+is the recommended way to run a local suite, in the Bash tool with `timeout: 600000`, on the changed files only; CI runs the full suite, the seeds and coverage. One at a time for anything that takes the Docker lock or times a run. Before a wave starts, add it to `waves.json`
 (`{"w1": {"from": "<ISO now>", "budgetUnits": N}}`) and close it with `"to"` when its last PR merges. `budgetUnits` is cost
 units: the sum of the wave's agents' role targets at first, then from the ledger.
 
@@ -61,8 +61,8 @@ suites that cannot go green yet), once, up front. Before dispatching a fix, name
 **Handback.** The agent ends with the block in `${CLAUDE_PLUGIN_ROOT}/references/handback.md`. Run
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs <session-dir> --agent <id>`, paste its line above the block in
 `run.md`, and sharpen (below).
-Nothing is sent to an agent that has handed back; a fix round is a fresh agent. The
-`SendMessage` hook enforces that; a message to a running agent always passes.
+Nothing goes to an agent that has handed back (the `SendMessage` hook refuses it); a fix
+round is a fresh agent.
 
 **CI.** One blocking command, run in the background by you (or by a `mechanical` agent when it is more than one
 command), using `bash ${CLAUDE_PLUGIN_ROOT}/scripts/wait-ci.sh <owner/repo> <pr>`. Nobody polls; no
@@ -96,7 +96,7 @@ per step). A change that would
 save a round, an agent or a recurring wait is applied before the next dispatch, not kept for the retro: a tool built, a
 brief or template fixed, a gate cut. Log it in `run.md` as "Sharpened". One reason twice is a tool or brief gap: build it
 before the next agent of that role. Only a change to this skill's own design waits for the retro.
-Hooks and scripts mark time by themselves; never time anything by hand, and profile only a sink `--time` calls big.
+Hooks mark time; never time anything by hand, and profile only a sink `--time` calls big.
 
 ## Decide, do not ask
 

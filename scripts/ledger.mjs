@@ -157,9 +157,10 @@ export function selfSession(cwd, home = homedir()) {
 }
 
 // The orchestrator's own line. Every turn re-reads the last context, so that, not the peak, is what continuing costs; a
-// compaction resets it and the peak stays. With waves, the most recent wave's turn count stands in for the next wave's:
-// handing off would re-read (last - freshSessionTokens) fewer tokens on each of them. Hand off when that saving is at
-// least handoff.minimumUnitsSaved.
+// compaction resets it and the peak stays. With waves, the most recent closed wave's turn count stands in for the next
+// wave's (a wave opened before this ran has no turns yet): handing off would re-read (last - freshSessionTokens) fewer
+// tokens on each of them. Hand off when that saving is at least handoff.minimumUnitsSaved, or when the last context is
+// past twice ceilingTokens, where a longer next wave makes the estimate low.
 export function selfLine(sessionDir, waves = {}, roles = loadRoles(), now = new Date()) {
   const main = `${sessionDir}.jsonl`
   const s = summarize(main)
@@ -169,14 +170,17 @@ export function selfLine(sessionDir, waves = {}, roles = loadRoles(), now = new 
   const head = `orchestrator ${basename(sessionDir)}: last context ${kt(s.lastContext)} (each turn re-reads it), peak ${kt(s.peakContext)}, ${s.turns} turns.`
   const named = Object.entries(waves).sort((a, b) => instant(a[1].from) - instant(b[1].from))
   if (!named.length) return { line: `${head} Pass --waves <file> for the handoff estimate.`, handOff: null, log: null }
-  const [name, wave] = named[named.length - 1]
+  const closed = named.filter(([, w]) => w.to)
+  const [name, wave] = (closed.length ? closed : named).at(-1)
   const turns = summarize(main, { since: wave.from, until: wave.to }).turns
   const { freshSessionTokens, minimumUnitsSaved } = roles.handoff
   const saved = units({ cacheRead: Math.max(0, s.lastContext - freshSessionTokens) * turns }, model, roles)
-  const handOff = saved >= minimumUnitsSaved
+  const pastCeiling = s.lastContext >= 2 * roles.ceilingTokens
+  const handOff = saved >= minimumUnitsSaved || pastCeiling
   return {
     line: `${head} Wave ${name}: ${turns} turns; a fresh session starts near ${kt(freshSessionTokens)}, and over as many turns ` +
-      `would save ${show(saved, roles)}. Hand off at the wave boundary: ${handOff ? 'yes' : 'no'} (threshold ${show(minimumUnitsSaved, roles)}).`,
+      `would save ${show(saved, roles)}. Hand off at the wave boundary: ${handOff ? 'yes' : 'no'} (threshold ${show(minimumUnitsSaved, roles)}` +
+      `${pastCeiling ? `; last context past twice the ${kt(roles.ceilingTokens)} ceiling` : ''}).`,
     handOff,
     log: `handoff-decision at=${now.toISOString()} session=${basename(sessionDir)} wave=${name} last_context=${s.lastContext} turns=${turns} predicted_units=${saved} handed_off=${handOff ? 'yes' : 'no'}`,
   }

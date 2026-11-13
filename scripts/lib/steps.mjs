@@ -4,7 +4,7 @@
 // "builder: w3 s07b ...": the first word, lower-cased, is the role key.
 export const keyOf = (description) => String(description ?? '').trim().split(/[\s:]/)[0].toLowerCase()
 
-const STEP = /\bw\d+\s+(?:s\d+[a-z]*|#\d+)/i
+const STEP = /\bw\d+\s+(?:s\d+[a-z\d]*|#\d+)/i
 
 // The step an agent worked, from its description ("builder: w3 s07b ...", "fix: w0 #641 review round"): the wave and the
 // step id or PR number after it. Agents whose description names none (the orchestrator, a wave-wide mechanical) have none.
