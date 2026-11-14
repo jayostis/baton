@@ -36,7 +36,8 @@ function layout() {
   return root
 }
 
-const run = (args, cwd) => spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8', env: gitEnv })
+// No ambient clones root or saved limits file: each test says where its clones are.
+const run = (args, cwd, env = {}) => spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8', env: { ...gitEnv, BATON_CLONES_ROOT: '', BATON_PROJECT_CONFIG: '', BATON_MACHINE_FILE: join(tmpdir(), 'baton-no-such-limits.json'), ...env } })
 
 test('clones: names each main clone beside this one that is off its default branch; a clone on main and a worktree are quiet', () => {
   const root = layout()
@@ -62,4 +63,30 @@ test('clones --pull <owner/repo>: fast-forwards the merged repo\'s clone when it
   assert.match(r.stdout, /alpha: pulled main to [0-9a-f]{7}/)
   const off = run(['--pull', 'owner/beta'], `${root}/clones/alpha`)
   assert.match(off.stdout, /beta: not pulled, it is on side/)
+})
+
+test('clones: from a folder that is no repository, the clones folder comes from BATON_CLONES_ROOT, the config\'s clones section or the saved limits file', () => {
+  const root = layout()
+  const away = mkdtempSync(join(tmpdir(), 'run-'))
+  const lost = run(['--pull', 'owner/alpha'], away)
+  assert.equal(lost.status, 0)
+  assert.match(lost.stdout, /cannot find the folder that holds the clones/)
+  const byEnv = run(['--pull', 'owner/alpha'], away, { BATON_CLONES_ROOT: `${root}/clones` })
+  assert.match(byEnv.stdout, /beta is on side, not main/)
+  assert.match(byEnv.stdout, /alpha: pulled main to [0-9a-f]{7}/)
+  const config = join(away, 'project.md')
+  writeFileSync(config, `# Project\n\n## clones\nroot: \`${root}/clones\`\n`)
+  assert.match(run([], away, { BATON_PROJECT_CONFIG: config }).stdout, /beta is on side/)
+  const limits = join(away, 'limits.json')
+  writeFileSync(limits, JSON.stringify({ heavy_slots: 1, clones_root: `${root}/clones` }))
+  assert.match(run([], away, { BATON_MACHINE_FILE: limits }).stdout, /beta is on side/)
+  assert.match(run(['--pull', 'owner/nothing'], away, { BATON_CLONES_ROOT: `${root}/clones` }).stdout, /no clone of owner\/nothing under/)
+})
+
+test('clones: a clone whose git config names baton.homeBranch is home on it, and is not pulled', () => {
+  const root = layout()
+  git(`${root}/clones/beta`, 'config', 'baton.homeBranch', 'side')
+  const r = run(['--pull', 'owner/beta'], `${root}/clones/alpha`)
+  assert.doesNotMatch(r.stdout, /beta is on/)
+  assert.match(r.stdout, /beta: not pulled, it sits on its home branch side/)
 })

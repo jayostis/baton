@@ -18,7 +18,7 @@ import { loadRoles } from './lib/roles.mjs'
 import { keyOf, stepOf } from './lib/steps.mjs'
 import { inEpic } from './epic-mode.mjs'
 import { paceWarning } from './lib/pace-warning.mjs'
-import { limits, readMachineSection, machineOff, weightOf, runningAgents, writeLimitsFile } from './lib/machine.mjs'
+import { limits, readMachineSection, readClonesRoot, machineOff, weightOf, runningAgents, writeLimitsFile } from './lib/machine.mjs'
 
 const minutes = (ms) => `${Math.round(ms / 60000)} min`
 // A heavy agent whose transcript was written this recently is alive: a second heavy agent on its step is refused. A live
@@ -55,7 +55,7 @@ if (process.argv[1] && basename(process.argv[1]) === 'dispatch-hook.mjs') {
   try {
     if (input.tool_name !== 'Agent' || machineOff() || !inEpic(input.session_id)) process.exit(0)
     const lim = limits({ config: readMachineSection(process.env, input.cwd) })
-    try { writeLimitsFile(lim) } catch {}
+    try { writeLimitsFile({ ...lim, clones_root: readClonesRoot(process.env, input.cwd) }) } catch {}
     const sessionDir = input.transcript_path ? String(input.transcript_path).replace(/\.jsonl$/, '') : null
     const running = sessionDir ? runningAgents(sessionDir, { exceptToolUse: input.tool_use_id }) : []
     const result = verdict(input, { running, lim })

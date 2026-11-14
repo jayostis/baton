@@ -11,19 +11,21 @@ import { loadRoles } from './roles.mjs'
 
 export const STALE_AGENT_MS = 90 * 60 * 1000
 
-// The `## machine` section of a project config: lines of `key: value`, optionally bulleted, values optionally in backticks.
-export function machineSection(text) {
+// A section of a project config (`## machine`, `## clones`): lines of `key: value`, optionally bulleted, values optionally in backticks.
+export function keyValueSection(text, name) {
   const out = {}
   let inside = false
   for (const line of String(text).split('\n')) {
     const heading = /^#{1,6}\s*(.*?)\s*$/.exec(line)
-    if (heading) { inside = heading[1].toLowerCase() === 'machine'; continue }
+    if (heading) { inside = heading[1].toLowerCase() === name; continue }
     if (!inside) continue
     const kv = /^\s*(?:[-*]\s*)?`?([a-z_]+)`?\s*:\s*(.*?)\s*$/.exec(line)
     if (kv && kv[2] !== '') out[kv[1]] = kv[2].replace(/^`+|`+$/g, '')
   }
   return out
 }
+
+export const machineSection = (text) => keyValueSection(text, 'machine')
 
 // The first command of a project config section (`## worktree`, `## review_worktree`): an indented line or a fenced one.
 export function sectionCommand(text, name) {
@@ -52,7 +54,14 @@ export function readMachineSection(env = process.env, cwd = process.cwd()) {
   try { return path ? machineSection(readFileSync(path, 'utf8')) : {} } catch { return {} }
 }
 
-const positive = (v) => (/^\d+$/.test(String(v ?? '')) && Number(v) > 0 ? Number(v) : null)
+// The folder that holds the project's clones: the `clones` section's `root:`, saved in the limits file for scripts that run
+// where the config is not readable (the gate's clones report).
+export function readClonesRoot(env = process.env, cwd = process.cwd()) {
+  const path = projectConfigPath(env, cwd)
+  try { return (path && keyValueSection(readFileSync(path, 'utf8'), 'clones').root) || null } catch { return null }
+}
+
+const positive =(v) => (/^\d+$/.test(String(v ?? '')) && Number(v) > 0 ? Number(v) : null)
 
 // heavy_slots: one per four logical cpus and one per 4 GB of memory beyond a 4 GB reserve for the sessions, whichever is
 // fewer, at least one. heavy_agents: one more than the slots, so a heavy agent is always starting or finishing while the

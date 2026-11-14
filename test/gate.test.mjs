@@ -66,7 +66,7 @@ esac
   return {
     dir,
     calls: () => readFileSync(log, 'utf8'),
-    run: (args) => spawnSync(BASH, [gate, 'o/r', '5', ...args], { cwd, encoding: 'utf8', timeout: 60000, env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}`, BATON_EVENTS: '0' } }),
+    run: (args, env = {}) => spawnSync(BASH, [gate, 'o/r', '5', ...args], { cwd, encoding: 'utf8', timeout: 60000, env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}`, BATON_EVENTS: '0', BATON_CLONES_ROOT: '', BATON_PROJECT_CONFIG: '', BATON_MACHINE_FILE: `${dir}/none.json`, ...env } }),
   }
 }
 
@@ -115,4 +115,13 @@ bashIt('gate.sh --merge --wait-main waits on main\'s new head when main-only job
   assert.equal(skip.status, 0, 'no main-only jobs: the PR ran every job, so the gate does not wait')
   assert.doesNotMatch(none.calls(), /run list/)
   assert.match(skip.stdout, /wait-ci\.sh o\/r --commit/)
+})
+
+bashIt('gate.sh --merge, run from a folder that is no repository, says where it looked for the merged repo\'s clone', () => {
+  const s = stubGh()
+  const lost = s.run(['--merge'])
+  assert.match(lost.stdout, /clones: cannot find the folder that holds the clones/)
+  const empty = mkdtempSync(join(tmpdir(), 'clones-')).replace(/\\/g, '/')
+  const looked = s.run(['--merge'], { BATON_CLONES_ROOT: empty })
+  assert.match(looked.stdout, /clones: no clone of o\/r under /)
 })

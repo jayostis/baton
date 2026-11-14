@@ -4,12 +4,14 @@
 //
 //   - a main clone moved off its default branch: `git switch <branch>`, `git checkout <branch|ref|-b|-|--detach>`, by the
 //     working directory, `cd X &&` / `Set-Location X;` or `git -C X`. A main clone is a repository whose git dir is its
-//     common dir, so not a linked worktree. `git checkout -- <path>`, `git checkout <ref> -- <path>`, `git restore` and a
+//     common dir, so not a linked worktree, with a remote named origin and outside the temp directory (a scratch repository is
+//     free). A clone whose git config sets `baton.homeBranch` may move to that branch. `git checkout -- <path>`, `git checkout <ref> -- <path>`, `git restore` and a
 //     return to the default branch pass. The refusal names the worktree to use.
 //   - `git stash` (list and show pass), a forced push, `git rebase` (--abort and --continue pass).
-//   - `gh pr|issue|run|workflow|release|label|cache` without -R, and `gh pr merge` at all: merges go through gate.sh.
-//   - `npm ci` in a linked worktree.
-//   - on Windows, `sed -i` and a heredoc written to a file: the Bash tool halves backslashes and files may be CRLF.
+//   - `gh pr|issue|run|workflow|release|label|cache` without -R (or GH_REPO set inline, earlier in the command or in the session),
+//     `gh pr checkout` in a main clone, and `gh pr merge` at all: merges go through gate.sh.
+//   - `npm ci` in a linked worktree whose node_modules already exists.
+//   - on Windows, `sed -i` and a heredoc that cat, tee, printf or echo writes to a file: the Bash tool halves backslashes and files may be CRLF.
 //
 // Quoted text and heredoc bodies are not read as commands. Exit 0 lets the call through; exit 2 blocks it and its stderr
 // goes back as the reason. Anything it cannot read (bad input, a directory that is not a repository) is let through.

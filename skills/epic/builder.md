@@ -14,7 +14,7 @@ file, 4 the plugin root, 5 the project config. Read those, the project config's 
   more pairs for a timing.
 - **Run tests, builds and `verify_command` (before every push) as `bash "<plugin root>/scripts/heavy.sh" <command>`**
   (recommended; Bash tool, `timeout: 600000`), on changed files only; the full gates are CI's. Merge `origin/main` before
-  every push, as its own commit. Commit in coherent steps and push early: only pushed work survives a stopped run.
+  every push, as its own commit, then `verify_command` again. Commit in coherent steps and push early: only pushed work survives.
 - **Settled is settled.** Fallout from a ruling in the step file is applied and said in one line. Decide, do not
   ask. Stuck on a settled item: hand back as blocked, quoting it.
 - **Your not-done list is work.** Finish it in this PR, or say why it cannot be.

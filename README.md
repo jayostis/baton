@@ -108,9 +108,11 @@ A project's own file lives in that project, never here.
   agent types with their own definition, forks and baton's agents are never. `SubagentStop` appends the agent's ledger
   row to the run log. `BATON_CONTEXT_CEILING` and `BATON_REQUIRE_MODEL=0` adjust them. Also in an epic,
   `scripts/guard-hook.mjs` on `Bash` and `PowerShell` refuses a main clone moved off its default branch (by the working
-  directory, `cd` or `git -C`; restoring files passes, and the refusal names the worktree to use), `git stash`, a forced
-  push, a rebase, `gh` without `-R`, `gh pr merge` outside the gate, `npm ci` in a linked worktree and, on Windows,
-  `sed -i` and a heredoc written to a file; `BATON_GUARD=0` turns it off. `scripts/walk-hook.mjs` on `SubagentHandback`
+  directory, `cd` or `git -C`, and `gh pr checkout`; restoring files passes, and the refusal names the worktree to use; a
+  main clone is one with a remote `origin` outside the temp directory, and one whose git config sets `baton.homeBranch` may
+  move to that branch), `git stash`, a forced push, a rebase, `gh` without `-R` (or `GH_REPO`), `gh pr merge` outside the
+  gate, `npm ci` in a linked worktree whose `node_modules` is already linked and, on Windows, `sed -i` and a heredoc that
+  `cat`, `tee`, `printf` or `echo` writes to a file; `BATON_GUARD=0` turns it off. `scripts/walk-hook.mjs` on `SubagentHandback`
   holds a walk's handback until it reports every numbered item of its input (`scripts/walk-check.mjs`).
 - **The machine's limits**, in an epic only: an agent costs the machine what it runs, not by the head. Each role in
   `references/roles.json` is `local` heavy (builders, fixers, mechanical: they run tests and builds) or light (readers,
