@@ -6,8 +6,8 @@ file, 4 the plugin root, 5 the project config. Read those, the project config's 
 
 ## Work
 
-- **Worktree.** Use the project's `worktree` tool, for every repo you touch. Never work in a main clone; never
-  `npm ci` in a linked worktree.
+- **Worktree.** Use the project's `worktree` tool, for every repo you touch. Never work in a main clone.
+- **A page step** drafts from the text on its prompt's `approved:` line, which the maintainer approved.
 - **Red first.** Follow `/baton:tdd`. Extend an existing test before adding one; one fixture per behaviour; delete a
   test your change makes redundant; report the test counts before and after.
 - **Measure only what the issue says decides.** Otherwise write "none, because". Counts before wall time; three or
@@ -18,7 +18,7 @@ file, 4 the plugin root, 5 the project config. Read those, the project config's 
 - **Settled is settled.** Fallout from a ruling in the step file is applied and said in one line. Decide, do not
   ask. Stuck on a settled item: hand back as blocked, quoting it.
 - **Your not-done list is work.** Finish it in this PR, or say why it cannot be.
-- **Shell.** No `git stash`. Edit and Write for repo files, not heredocs. Start no background commands.
+- **Shell.** Edit and Write for repo files. Start no background commands.
 
 ## Before you hand back
 

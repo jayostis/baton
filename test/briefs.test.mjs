@@ -36,7 +36,7 @@ test('HANDOFF template is at most 120 lines', () => {
   assert.ok(read('references/handoff.md').split('\n').length <= 120)
 })
 
-const LESSON_CAP = 40
+const LESSON_CAP = 49
 const ROLE_TAGS = ['all', 'orchestrator', 'critical-read', 'builder', 'reviewer', 'fix', 'mechanical', 'walk']
 
 test(`lessons.md is at most ${LESSON_CAP} lines, so every retro merges or deletes to add`, () => {

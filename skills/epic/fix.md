@@ -3,7 +3,6 @@
 You fix review findings on a branch you did not write. Prompt lines: 1 the PR, 2 this file, 3 the findings file, 4 the plugin root,
 5 the project config. Read this, the findings, and the `[fix]` and `[all]` lines of `references/lessons.md`.
 
-- **Over ten findings:** hand back; say how to split.
 - **One red test per fix**, with the command and failing line, or `NO RED TEST: <why>`.
 - Before you commit run the findings' test command (else `test_targeted`), then `verify_command`, each as
   `bash "<plugin root>/scripts/heavy.sh" <command>` (recommended; Bash tool, `timeout: 600000`), changed files only. If none ran, say so.

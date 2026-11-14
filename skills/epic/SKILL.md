@@ -22,8 +22,8 @@ your impression of the spend.
 
 3. **Roles.** `${CLAUDE_PLUGIN_ROOT}/references/roles.json` is the table: role, model, effort, token target, brief.
    Briefs are in `${CLAUDE_PLUGIN_ROOT}/skills/epic/`.
-4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which turns on the model
-   and dispatch hooks; `off` when the retro is done.
+4. **Epic mode.** `node ${CLAUDE_PLUGIN_ROOT}/scripts/epic-mode.mjs on` marks this session as an epic, which turns on the hooks:
+   model, dispatch, shell guard, walk check; `off` when the retro is done.
 5. **Lessons.** `${CLAUDE_PLUGIN_ROOT}/references/lessons.md`, tagged by role. Read the `[orchestrator]` and `[all]`
    lines now; each brief names the tag its agent reads.
 6. **Machine and CI.** Read the config's `machine:` section and CI's runtime (`references/pace.md`).
@@ -32,8 +32,8 @@ your impression of the spend.
 
 **Plan.** One issue per step, from `${CLAUDE_PLUGIN_ROOT}/references/epic-step.yml`: problem, in and out of scope,
 the check that goes red first, files by name, settled sections cited. Fallout from a settled ruling is applied and
-said in one line, never raised again. A page or copy step starts from a story and audience the maintainer approved as
-plain text.
+said in one line, never raised again. A page or copy step declares `kind: page`; `dispatch.mjs` refuses it without
+`--approved <file>`, the story and audience the maintainer approved as plain text.
 
 **One critical read** before anything is built: the `critical-read` role, brief `critical-read.md`, over all the steps
 together against the code. Apply its must-fixes to the issues. It also assigns each step a role and a wave. Steps that
@@ -74,20 +74,19 @@ you, logged. Related PRs may share one reviewer. Its prompt also names the red l
 so it does not rediscover them.
 
 **Fix.** A fresh `fix` agent, brief `fix.md`, given the findings file and the branch, not the history. The findings
-file quotes the reviewer's items and any ruling they touch word for word, and names the targeted test command from the
-project config. It opens with `Reason: <word>` (words, test, review, ci-red, flake, conflict, other), which `dispatch.mjs`
-puts in the description. More than ten findings: split into two agents. It posts one PR comment and pushes. A CI red on
-a branch whose fixer is still running goes to that fixer by `SendMessage`. Never `/baton:pr loop` in an epic.
+file opens with `Reason: <word>` (words, test, review, ci-red, flake, conflict, other), which goes in the description,
+then `Test: <targeted command>` and `Rerun: <probe results rerun on the head>`, and quotes the reviewer and any ruling
+word for word; `dispatch.mjs` refuses it past ten findings or without those lines. Never `/baton:pr loop` in an epic.
 
-**Merge.** Only through `bash ${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh <owner/repo> <pr> [--merge] [--allow <check>]...`,
-once reviewed and green. Running the epic is merge permission; never ask, unless the maintainer withdrew it. The gate reads state
-itself (mergeability, checks on the current head, threads), never a review: confirm the PR's head is the one reviewed
-(or a fix round's push the review covered). `--allow` is only for a check a Depends-On partner's PR turns green, which
-the PR body names. No `--admin`. Pairs merge back to back.
-After each merge, start `wait-ci.sh` on the base branch's new head in the background; a red main is the next fix.
+**Merge.** Only through `bash ${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh <owner/repo> <pr> [--merge --wait-main] [--allow <check>]...`,
+in the background, once reviewed and green. Running the epic is merge permission; never ask, unless the maintainer
+withdrew it. The gate reads state itself, never a review: confirm the PR's head is the one reviewed (or a fix round's
+push the review covered). `--allow` is only for a check a Depends-On partner's PR turns green. Pairs merge back to
+back. The gate names the jobs the PR never ran (main only); with some, it waits on main's new head, exit 3 if red;
+else start the `wait-ci.sh --commit` line it prints. A red main is the next fix.
 
-**Walk.** When the last PR is merged, the `walk` role, `walk.md`, drives what shipped. Its findings become issues;
-count them for the retro.
+**Walk.** When the last PR is merged, the `walk` role, `walk.md`, drives what shipped from a numbered list
+(`--input`); a hook holds its handback until every item is reported. Its findings become issues; count them.
 
 ## Sharpen as you go
 

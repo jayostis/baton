@@ -87,8 +87,12 @@ A project's own file lives in that project, never here.
   `Agent` hook refuses one that does not. Defaults: critical read Opus; builder Sonnet; review of new logic Opus, of a
   small diff Sonnet; fix always a fresh Sonnet at medium effort with at most ten findings; mechanical steps Haiku.
 - **Gate and CI wait**, `scripts/gate.sh` and `scripts/wait-ci.sh`, both `<owner/repo>` and `gh` only. `gate.sh <owner/repo> <pr>
-  [--merge] [--allow <check>]...` is the only merge path: it reads mergeability, checks on the head and threads itself, and
-  never bypasses BLOCKED, UNKNOWN or BEHIND. `wait-ci.sh <owner/repo> <pr>|--commit <sha>` blocks until every run on the
+  [--merge [--wait-main]] [--allow <check>]...` is the only merge path: it reads mergeability, checks on the head and threads
+  itself, and never bypasses BLOCKED, UNKNOWN or BEHIND. It names the jobs the PR never ran because they run on main only
+  (`scripts/main-only.mjs` over the workflows at the PR's head); after a merge it prints the `wait-ci.sh --commit` line
+  for the base's new head, names main clones beside the repo that are off their default branch and fast-forwards the
+  merged repo's clone (`scripts/clones.mjs`); with `--wait-main` and main-only jobs it waits on the new head itself and
+  exits 3 when it is red. `wait-ci.sh <owner/repo> <pr>|--commit <sha>` blocks until every run on the
   head finishes and exits 0 only when all passed or were skipped.
 - **Ledger**, `scripts/ledger.mjs`: reads the session transcripts, so it costs no tokens and needs no token. Per agent: turns,
   peak context, cache read and write, output, minutes, and **cost units**. Slices with `--since`, `--until`, `--wave`;
@@ -102,7 +106,12 @@ A project's own file lives in that project, never here.
   resuming one; a message starting `RESUME-APPROVED:` passes); a message to a running agent always passes. In an
   epic only (`scripts/epic-mode.mjs on`, or `BATON_EPIC=1`), a general-purpose `Agent` call without a model is refused;
   agent types with their own definition, forks and baton's agents are never. `SubagentStop` appends the agent's ledger
-  row to the run log. `BATON_CONTEXT_CEILING` and `BATON_REQUIRE_MODEL=0` adjust them.
+  row to the run log. `BATON_CONTEXT_CEILING` and `BATON_REQUIRE_MODEL=0` adjust them. Also in an epic,
+  `scripts/guard-hook.mjs` on `Bash` and `PowerShell` refuses a main clone moved off its default branch (by the working
+  directory, `cd` or `git -C`; restoring files passes, and the refusal names the worktree to use), `git stash`, a forced
+  push, a rebase, `gh` without `-R`, `gh pr merge` outside the gate, `npm ci` in a linked worktree and, on Windows,
+  `sed -i` and a heredoc written to a file; `BATON_GUARD=0` turns it off. `scripts/walk-hook.mjs` on `SubagentHandback`
+  holds a walk's handback until it reports every numbered item of its input (`scripts/walk-check.mjs`).
 - **The machine's limits**, in an epic only: an agent costs the machine what it runs, not by the head. Each role in
   `references/roles.json` is `local` heavy (builders, fixers, mechanical: they run tests and builds) or light (readers,
   reviewers; `defaultLocal` names the description keys the table lacks). One `PreToolUse` hook on `Agent`,
@@ -134,7 +143,9 @@ A project's own file lives in that project, never here.
   a second or later round, a round reason seen twice with no `Sharpened` line in the run log since, an agent of the
   dispatched role past twice that role's median, slot waits over ten minutes in the wave); it warns, never blocks, and is
   silent when it cannot read the data.
-- **Lessons**, `references/lessons.md`: one-line rules tagged by role, capped at 80 lines by a test.
+- **Lessons**, `references/lessons.md`: one-line rules tagged by role, capped by a test, each ending `(no check: <why>)`.
+  A repeated problem is fixed by a check (a hook, a script the loop calls, a test); a lesson is only for what none can
+  enforce, and a lesson a check covers is deleted.
 - **Retro**, `skills/epic/retro.md`: runs the ledger, compares with the project's `epics.csv`, reads the handback blocks and
   opens one PR to this repository. The maintainer merges it; nothing updates itself. `scripts/history.mjs` builds
   `epics.csv` rows from a spec of epics (attributing each session to the epic its transcript names most), which is also

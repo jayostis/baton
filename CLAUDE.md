@@ -86,8 +86,9 @@ the retro reads the ledger.
 ## The epic
 
 - **Briefs have word caps** (`test/briefs.test.mjs`): orchestrator 1,500, builder 500, reviewer 450, fix 200,
-  critical read 500, mechanical 150, walk and retro 400. `references/lessons.md` has a hard cap of 80 lines. A change
-  that needs more room first deletes something.
+  critical read 500, mechanical 150, walk and retro 400. `references/lessons.md` has a hard cap (its line count, in
+  the test), and every line ends `(no check: <why>)`: a repeated problem becomes a hook, a script the loop calls or a
+  test, and a lesson is only for what none can enforce. A change that needs more room first deletes something.
 - **Every dispatch names its model**, and `references/roles.json` is where the models and the cost weights live.
   The weights are list-price ratios, not measurements, until a retro calibrates them.
 - **Hooks are `hooks/hooks.json`**, validated with `claude plugin validate`. A hook exits 2 to block and prints its
