@@ -303,6 +303,7 @@ test('dispatch.mjs leaves lines 4 and 5 of a cold-read blank, takes a fix round\
   assert.equal(c.lines[0], 'the page text')
   assert.ok(c.lines[1].endsWith('/notes/cold.md'))
   assert.ok(c.lines[2].endsWith('/notes/page.txt'))
+  assert.equal(dispatch({ role: 'builder', step: 'w7 #777', subject: 'x', input: 'https://github.com/o/r/issues/777' }, { env }).lines[2], 'https://github.com/o/r/issues/777')
   assert.equal(c.lines[3], '')
   assert.equal(c.lines[4], '')
   assert.equal(c.model, null, 'a cold-read is not in the role table: the model is the project\'s call')

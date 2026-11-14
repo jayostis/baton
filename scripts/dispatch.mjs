@@ -24,6 +24,8 @@ import { stepOf, reasonFromFindings } from './lib/steps.mjs'
 
 export const PLUGIN_ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\\/g, '/').replace(/\/$/, '')
 const slash = (p) => resolve(p).replace(/\\/g, '/')
+// An issue or PR given by its URL is passed as it is; resolve() made it a path under the working directory.
+const inputLine = (p) => (/^https?:\/\//.test(p) ? p : slash(p))
 
 // The first indented command of the `## review_worktree` section, or a fenced one.
 export function reviewCall(configText, slot) {
@@ -59,7 +61,7 @@ export function dispatch({ role, step, subject, input, slot, brief }, { roles = 
     reason = `${found ?? 'other'} `
   }
   const short = String(subject).replace(/\s+/g, ' ').trim().slice(0, 40).trim()
-  const lines = [subject, briefPath, input ? slash(input) : '', cold ? '' : PLUGIN_ROOT, cold ? '' : slash(config)]
+  const lines = [subject, briefPath, input ? inputLine(input) : '', cold ? '' : PLUGIN_ROOT, cold ? '' : slash(config)]
   let review = null
   if (role.startsWith('review')) {
     review = reviewCall(readFileSync(config, 'utf8'), slot)
