@@ -24,7 +24,7 @@ in on their behalf.
 ## 3 — File it when they say so
 
 ```bash
-gh issue create --title "<title>" --body-file <file>
+gh issue create -R <owner/repo> --title "<title>" --body-file <file>
 ```
 
 `--template` only seeds body text and cannot render a YAML form, so **you are writing the body by

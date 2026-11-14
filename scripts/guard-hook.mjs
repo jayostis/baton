@@ -15,10 +15,9 @@
 // goes back as the reason. Anything it cannot read (bad input, a directory that is not a repository) is let through.
 // BATON_GUARD=0 turns it off.
 
-import { readFileSync } from 'node:fs'
-import { basename } from 'node:path'
-import { posix } from 'node:path'
-import { homedir } from 'node:os'
+import { readFileSync, existsSync, realpathSync } from 'node:fs'
+import { basename, posix } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { inEpic } from './epic-mode.mjs'
 import { run as realRun } from './lib/exec.mjs'
@@ -44,6 +43,7 @@ export function segments(command, cwd, platform = process.platform) {
   const text = String(command)
   const out = []
   let seg = { argv: [], cwd, redirects: [], heredoc: false }
+  const saved = []
   let tok = null
   let pendingRedirect = false
   const heredocs = []
@@ -141,8 +141,11 @@ export function segments(command, cwd, platform = process.platform) {
     if (c === '&' && next === '>') { endTok(); pendingRedirect = true; i += next === '>' && text[i + 2] === '>' ? 2 : 1; continue }
     if (c === ';' || c === '|' || c === '&' || c === '(' || c === ')') {
       const piped = c === '|' && next !== '|' && seg.heredoc
+      const source = seg.heredocSource ?? seg
       endSeg()
-      if (piped) seg.heredoc = true
+      if (piped) { seg.heredoc = true; seg.heredocSource = source }
+      if (c === '(') saved.push(cwd)
+      if (c === ')' && saved.length) { cwd = saved.pop(); seg.cwd = cwd }
       if ((c === '&' || c === '|') && next === c) i++
       continue
     }
@@ -161,8 +164,22 @@ function repoAt(dir, run) {
   if (!r.ok) return null
   const [top, gitDir, common] = r.out.split(/\r?\n/).map((l) => l.trim().replace(/\\/g, '/').replace(/\/$/, ''))
   if (!top || !gitDir || !common) return null
-  return { top, main: gitDir.toLowerCase() === common.toLowerCase() }
+  const main = gitDir.toLowerCase() === common.toLowerCase()
+  return { top, main, linked: !main, guarded: main && hasOrigin(top, run) && !underTemp(top) }
 }
+
+// A guarded main clone is the project's own checkout: a clone with a remote named origin, outside the temp directory. A
+// scratch repository (git init, no origin, or anything under Temp) is nobody's sibling and may switch as it likes.
+const hasOrigin = (dir, run) => run('git', ['-C', dir, 'remote', 'get-url', 'origin']).ok
+function underTemp(dir) {
+  const low = (p) => String(p).replace(/\\/g, '/').replace(/\/$/, '').toLowerCase()
+  const roots = [tmpdir()]
+  try { roots.push(realpathSync(tmpdir())) } catch {}
+  return roots.some((r) => low(dir).startsWith(`${low(r)}/`))
+}
+
+// The branch a clone is meant to sit on when it is not its default: git config baton.homeBranch.
+export const homeBranch = (dir, run) => run('git', ['-C', dir, 'config', '--get', 'baton.homeBranch']).out || null
 
 export function defaultBranch(dir, run) {
   const head = run('git', ['-C', dir, 'symbolic-ref', '--short', '-q', 'refs/remotes/origin/HEAD'])
@@ -195,8 +212,12 @@ function worktreeFor(repo, target, run, env) {
 
 const WINDOWS_EDIT = 'On Windows the Bash tool halves a doubled backslash even inside single quotes, and a file may be CRLF on disk, so a scripted edit can wreck it without an error (three fix rounds in one epic): write the file with the Edit or Write tool.'
 
-function check(seg, { run, env, platform }) {
-  const at = seg.argv.findIndex((a) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(a) && !WRAPPERS.has(a))
+const commandAt = (argv) => argv.findIndex((a) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(a) && !WRAPPERS.has(a))
+const commandName = (seg) => { const i = commandAt(seg.argv); return i < 0 ? '' : bin(seg.argv[i]) }
+const SETS_GH_REPO = /^(?:export\s+|\$env:)?GH_REPO\s*=\s*\S/i
+
+function check(seg, { run, env, platform, state }) {
+  const at = commandAt(seg.argv)
   if (at < 0) return null
   const [first, ...rest] = seg.argv.slice(at)
   const name = bin(first)
@@ -220,7 +241,7 @@ function check(seg, { run, env, platform }) {
     }
     if (sub === 'bisect') {
       const repo = repoAt(dir, run)
-      if (!repo?.main || ['log', 'visualize', 'view', 'help'].includes(args[0])) return null
+      if (!repo?.guarded || ['log', 'visualize', 'view', 'help'].includes(args[0])) return null
       return `Not run: ${repo.top} is a main clone, and git bisect detaches its HEAD. Bisect in a worktree: ${worktreeFor(repo, null, run, env)}.`
     }
     if (sub !== 'switch' && sub !== 'checkout') return null
@@ -230,34 +251,46 @@ function check(seg, { run, env, platform }) {
     const creates = flags.some((f) => /^(-[bBcC]\S*|--create(=.*)?|--force-create(=.*)?|--orphan(=.*)?|--detach|-d)$/.test(f))
     if (!creates && !target) return null
     const repo = repoAt(dir, run)
-    if (!repo || !repo.main) return null
+    if (!repo?.guarded) return null
     const base = defaultBranch(repo.top, run)
-    if (!creates && target === base) return null
+    const home = homeBranch(repo.top, run)
+    if (!creates && (target === base || target === home)) return null
     if (sub === 'checkout' && !creates && target !== '-' && !isRef(repo.top, target, run)) return null
     const attached = flags.map((f) => /^(?:-[bBcC]|--create=|--force-create=|--orphan=)(.+)$/.exec(f)?.[1]).find(Boolean)
     const branch = creates ? attached ?? args.find((a, i) => /^(-[bBcC]|--create|--force-create|--orphan)$/.test(args[i - 1] ?? '')) ?? target : target === '-' ? null : target
-    return `Not run: ${repo.top} is a main clone, and git ${sub} ${args.join(' ')} would move it off ${base}. A main clone stays on its default branch (three were left on a branch in one epic, and every sibling reading it went stale). Work in a worktree: ${worktreeFor(repo, branch, run, env)}. To read a file at another ref: git show <ref>:<path>.`
+    return `Not run: ${repo.top} is a main clone, and git ${sub} ${args.join(' ')} would move it off ${home ?? base}. A main clone stays on its default branch (three were left on a branch in one epic, and every sibling reading it went stale). Work in a worktree: ${worktreeFor(repo, branch, run, env)}. To read a file at another ref: git show <ref>:<path>.`
   }
   if (name === 'gh') {
-    const [sub, verb] = rest
+    let g = 0
+    let flagged = false
+    while (g < rest.length && rest[g].startsWith('-')) {
+      if (rest[g] === '-R' || rest[g] === '--repo') { flagged = true; g += 2 } else { flagged ||= rest[g].startsWith('--repo=') || /^-R\S/.test(rest[g]); g += 1 }
+    }
+    const [sub, verb] = rest.slice(g)
     if (sub === 'pr' && verb === 'merge') {
       return `Not run: gh pr merge. Merge only through the gate, which reads the merge state, the checks on the head and the threads itself: bash "${PLUGIN_ROOT}/scripts/gate.sh" <owner/repo> <pr> --merge. Never --admin.`
     }
-    const named = seg.argv.slice(0, at).some((a) => /^GH_REPO=\S/.test(a))
+    const named = state.ghRepo || flagged || seg.argv.slice(0, at).some((a) => /^GH_REPO=\S/.test(a))
     if (['pr', 'issue', 'run', 'workflow', 'release', 'label', 'cache'].includes(sub) && !named && !rest.some((a) => a === '-R' || a === '--repo' || a.startsWith('--repo=') || /^-R\S/.test(a)) && !rest.includes('--help')) {
       return `Not run: gh ${sub} ${verb ?? ''} without -R owner/repo. gh picks the repository from the working directory's remotes, upstream first, and answered about the wrong one four times in one epic: pass -R.`
+    }
+    if (sub === 'pr' && verb === 'checkout') {
+      const repo = repoAt(seg.cwd, run)
+      if (repo?.guarded) return `Not run: gh pr checkout in ${repo.top}, a main clone: it would move it off ${homeBranch(repo.top, run) ?? defaultBranch(repo.top, run)}. Work in a worktree: ${worktreeFor(repo, null, run, env)}, and check the PR out there.`
     }
     return null
   }
   if (name === 'npm' && rest[0] === 'ci') {
     const repo = repoAt(seg.cwd, run)
-    if (repo && !repo.main) return `Not run: npm ci in a linked worktree (${repo.top}). It costs 5-12 minutes each time, and the project's worktree tool links the main clone's dependencies; run it in the main clone if they are stale.`
+    if (repo?.linked && existsSync(`${repo.top}/node_modules`)) return `Not run: npm ci in a linked worktree (${repo.top}) whose node_modules is already linked. It costs 5-12 minutes each time and replaces the main clone's dependencies the link shares; run it in the main clone if they are stale.`
     return null
   }
   if (platform === 'win32') {
     if (name === 'sed' && rest.some((a) => /^--in-place/.test(a) || /^-[a-zA-Z]*i/.test(a))) return `Not run: sed -i. ${WINDOWS_EDIT}`
     const fileTarget = seg.redirects.some((t) => !/^\/dev\/null$|^nul$|^\$null$/i.test(t))
-    if (seg.heredoc && (fileTarget || (name === 'tee' && rest.some((a) => !a.startsWith('-'))))) return `Not run: a heredoc written to a file. ${WINDOWS_EDIT}`
+    const owner = seg.heredocSource ?? seg
+    const writes = ['cat', 'tee', 'printf', 'echo'].includes(commandName(owner)) && ((seg === owner && fileTarget) || (name === 'tee' && rest.some((a) => !a.startsWith('-'))))
+    if (seg.heredoc && writes) return `Not run: a heredoc written to a file. ${WINDOWS_EDIT}`
   }
   return null
 }
@@ -267,9 +300,11 @@ export function verdict(input, { env = process.env, epic = inEpic(input.session_
   if (!['Bash', 'PowerShell'].includes(input.tool_name) || env.BATON_GUARD === '0' || !epic) return { block: false }
   const command = input.tool_input?.command
   if (!command) return { block: false }
+  const state = { ghRepo: Boolean(env.GH_REPO) }
   for (const seg of segments(command, toPath(input.cwd || process.cwd(), '/', platform), platform)) {
-    const reason = check(seg, { run, env, platform })
+    const reason = check(seg, { run, env, platform, state })
     if (reason) return { block: true, reason }
+    if (SETS_GH_REPO.test(seg.argv.join(' '))) state.ghRepo = true
   }
   return { block: false }
 }

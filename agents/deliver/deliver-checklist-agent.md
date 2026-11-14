@@ -25,7 +25,7 @@ issue did not declare.
 
 ### 1. Read what was declared
 
-`gh issue view <issue>` — the **Verification types** checkboxes and the **Verification shapes**
+`gh issue view <issue> -R <owner/repo>` — the **Verification types** checkboxes and the **Verification shapes**
 text. Those are your items, and the shapes are the wording rather than a starting point. Types
 ticked with no shape written, or a shape for a type nobody ticked, are both **report, not
 repair**.
@@ -65,7 +65,7 @@ its *what right looks like* faithfully; it has no command and no SHA.
 
 ### 4. Edit the PR body
 
-`gh pr view <pr> --json body`, then `gh pr edit <pr> --body-file`. **Preserve everything already
+`gh pr view <pr> -R <owner/repo> --json body`, then `gh pr edit <pr> -R <owner/repo> --body-file`. **Preserve everything already
 there** — `Closes #N` above all, since dropping it unlinks the issue.
 
 A `## Verification` section already present is a resumed delivery: **replace that section**,

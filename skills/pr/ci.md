@@ -8,8 +8,8 @@ result to report, not a reason to sit there. Each invocation is one attempt.
 Pin the query to the **PR's** head, never to local `HEAD` — your checkout may be elsewhere.
 
 ```bash
-SHA=$(gh pr view <pr> --json headRefOid --jq .headRefOid)
-gh run list --commit "$SHA"
+SHA=$(gh pr view <pr> -R <owner/repo> --json headRefOid --jq .headRefOid)
+gh run list -R <owner/repo> --commit "$SHA"
 ```
 
 **Full SHA only** — an abbreviated one returns an empty list with no error, which reads exactly
@@ -26,10 +26,10 @@ like "no CI ran".
 ## 2 — One attempt
 
 ```bash
-gh run view <run-id> --log-failed
+gh run view <run-id> -R <owner/repo> --log-failed
 ```
 
-**Assert the checkout first** — `gh pr view <pr> --json headRefName` against
+**Assert the checkout first** — `gh pr view <pr> -R <owner/repo> --json headRefName` against
 `git rev-parse --abbrev-ref HEAD`, and `git status --porcelain` clean. Differ or dirty → **stop
 and report.** Do not switch branches: this verb takes a number, and moving someone's tree is not
 in it.

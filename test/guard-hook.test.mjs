@@ -182,7 +182,7 @@ test('guard: a cd inside parentheses does not change the directory after them', 
   assert.equal(hook(`(cd ${main} && ls); git switch -c y`, wt).status, 0)
   assert.equal(hook(`(cd ${main} && git switch -c y)`, wt).status, 2, 'still read inside')
   assert.equal(hook(`cd ${main} && git switch -c y`, wt).status, 2)
-  assert.deepEqual(segments('(cd /x && ls); pwd', '/a').map((s) => s.cwd), ['/a', '/x', '/a'])
+  assert.deepEqual(segments('(cd /xy && ls); pwd', '/a').map((s) => s.cwd), ['/a', '/xy', '/a'])
 })
 
 test('guard: a clone whose git config names baton.homeBranch may move to it', () => {
