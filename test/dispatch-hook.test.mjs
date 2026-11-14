@@ -44,6 +44,20 @@ test('verdict: one sharpen agent runs past the caps and takes no place from the 
   assert.equal(verdict(desc('builder: w1 s09'), { epic: true, running: [full[0], full[1], running('heavy', 'sharpen: w1 gate')], lim: lim() }).block, false, 'the sharpening agent does not count against the others')
 })
 
+test('verdict: a heavy agent for a step whose heavy agent is still writing is refused; once that one is quiet 15 minutes it passes', () => {
+  const live = [running('heavy', 'builder: w1 s01 the step', 4 * 60000)]
+  const fix = verdict(desc('fix: w1 s01 ci-red red build'), { epic: true, running: live, lim: lim() })
+  assert.equal(fix.block, true)
+  assert.match(fix.reason, /builder: w1 s01 the step is still working on w1 s01 \(quiet 4 min\)/)
+  assert.match(fix.reason, /SendMessage/)
+  assert.match(fix.reason, /15 minutes/)
+  assert.equal(verdict(desc('builder: w1 s01 again'), { epic: true, running: [running('heavy', 'builder: w1 s01 the step', 16 * 60000)], lim: lim() }).block, false, 'quiet 16 minutes: taken for dead')
+  assert.equal(verdict(desc('fix: w1 s02 words'), { epic: true, running: live, lim: lim() }).block, false, 'another step')
+  assert.equal(verdict(desc('review-small: w1 s01'), { epic: true, running: live, lim: lim() }).block, false, 'a reader of the same step')
+  assert.equal(verdict(desc('fix: w0 #641 words'), { epic: true, running: [running('heavy', 'fix: w0 #641 test', 60000)], lim: lim() }).block, true, 'a PR number is a step key too')
+  assert.equal(verdict(desc('mechanical: wave-wide'), { epic: true, running: [running('heavy', 'mechanical: wave-wide x', 60000)], lim: lim() }).block, false, 'no step key, no match')
+})
+
 test('verdict: outside an epic, with BATON_MACHINE=0, or for any tool but Agent, nothing is refused', () => {
   const full = Array.from({ length: 12 }, (_, i) => running('heavy', `builder: ${i}`))
   assert.deepEqual(verdict(desc('builder: x'), { epic: false, running: full, lim: lim() }), { block: false })

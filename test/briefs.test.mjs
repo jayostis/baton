@@ -36,7 +36,7 @@ test('HANDOFF template is at most 120 lines', () => {
   assert.ok(read('references/handoff.md').split('\n').length <= 120)
 })
 
-const LESSON_CAP = 80
+const LESSON_CAP = 40
 const ROLE_TAGS = ['all', 'orchestrator', 'critical-read', 'builder', 'reviewer', 'fix', 'mechanical', 'walk']
 
 test(`lessons.md is at most ${LESSON_CAP} lines, so every retro merges or deletes to add`, () => {
@@ -50,6 +50,7 @@ test('every lesson is one line tagged by a role the briefs read, and the briefs 
     const tag = /^\[([a-z-]+)\] \S/.exec(l)?.[1]
     assert.ok(ROLE_TAGS.includes(tag), `untagged or unknown tag: ${l.slice(0, 60)}`)
   }
+  for (const l of lines) assert.match(l, /\(no check: [^()]*\S[^()]*\)$/, `a lesson a check could enforce is a check, and a covered one is deleted; this one says neither: ${l.slice(0, 80)}`)
   for (const f of readdirSync(join(root, 'skills/epic')).filter((n) => n.endsWith('.md') && n !== 'SKILL.md' && n !== 'retro.md')) {
     for (const [, tag] of read(`skills/epic/${f}`).matchAll(/`\[([a-z-]+)\]`/g)) assert.ok(ROLE_TAGS.includes(tag), `${f} reads tag ${tag}`)
   }
@@ -99,7 +100,7 @@ test('every agent file names its model; none inherits', () => {
 test('hooks.json wraps its events, and every hook runs a script that exists', () => {
   const hooks = JSON.parse(read('hooks/hooks.json')).hooks
   const pre = hooks.PreToolUse
-  assert.deepEqual(pre.map((h) => h.matcher).sort(), ['Agent', 'SendMessage'])
+  assert.deepEqual(pre.map((h) => h.matcher).sort(), ['Agent', 'Bash|PowerShell', 'SendMessage', 'SubagentHandback'])
   const events = [...pre, ...hooks.PostToolUse, ...hooks.SubagentStop]
   assert.deepEqual(hooks.PostToolUse.map((h) => h.matcher), ['Agent'])
   for (const entry of events) {
