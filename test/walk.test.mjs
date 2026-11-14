@@ -21,12 +21,14 @@ const ALL = 'Walked the preview.\n\n1. walked: the first screen reads well\n2. n
 test('walkItems reads the top-level numbered items; uncovered names those the handback does not report', () => {
   assert.deepEqual(walkItems(LIST), [1, 2, 3])
   assert.deepEqual(walkItems('- a\n- b\n'), [])
+  assert.deepEqual(walkItems('1. a\n   4. nested under 1, not an item\n2. b\n'), [1, 2])
   assert.deepEqual(walkItems(''), [])
   assert.deepEqual(uncovered(LIST, ALL), [])
   assert.deepEqual(uncovered(LIST, '1. walked\n3. Walked: fine\n'), [2])
   assert.deepEqual(uncovered(LIST, 'Items 1, 2 and 3 were walked.\n'), [1, 2, 3], 'a sentence is not a report of each item')
   assert.deepEqual(uncovered(LIST, '1. walked\n2. looked at it\n3. not walked\n'), [2], 'an item line that says neither')
   assert.deepEqual(uncovered(LIST, '1. walked\n2. walked\n3. walked\n4. walked\n'), [], 'an extra line is not a failure')
+  assert.deepEqual(uncovered(LIST, '1. Hub evals pages (rt#774): walked, no defect.\n   - 2. walked, a sub-bullet\n2. Status: Not walked, the preview 404s\n3. Search (#768) - walkedthrough\n'), [3], 'the item\'s own line says walked or not walked, after its title too')
 })
 
 test('walk-check.mjs exits 0 when every item is reported, 1 naming the missing ones, 2 for an input with no list', () => {

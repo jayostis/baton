@@ -337,6 +337,7 @@ test('dispatch.mjs refuses a findings file past ten findings or without its Test
   assert.throws(() => dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file(head + items(11)) }, { env }), /11 findings.*split/)
   assert.throws(() => dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file('Reason: review\nRerun: none\n\n1. a\n') }, { env }), /Test:/)
   assert.throws(() => dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file('Reason: review\nTest: x\n\n1. a\n') }, { env }), /Rerun:/)
+  assert.equal(dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file('Reason: review\n\nTargeted tests: node --test a.test.js\nRerun: none\n\n1. a\n') }, { env }).lines.length, 5, 'the form findings files already use')
   assert.throws(() => dispatch({ role: 'builder', step: 'w1 s01', subject: 'x', input: file('Change scripts/gate.sh:42 and lib/a.ts:7.\n') }, { env }), /line number.*gate\.sh:42/)
   assert.equal(dispatch({ role: 'builder', step: 'w1 s01', subject: 'x', input: file('Change `wait()` in scripts/gate.sh; 10:30 is a time.\n') }, { env }).lines.length, 5)
   assert.equal(dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file(head + '1. scripts/gate.sh:42 is wrong\n') }, { env }).lines.length, 5, 'a finding may quote the reviewer\'s file:line')

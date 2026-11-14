@@ -26,6 +26,7 @@ import { projectConfigPath, sectionCommand } from './lib/machine.mjs'
 
 const PLUGIN_ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\\/g, '/').replace(/\/$/, '')
 const CD = new Set(['cd', 'chdir', 'pushd', 'set-location', 'sl', 'push-location'])
+const WRAPPERS = new Set(['command', 'env', 'exec', 'nohup', 'sudo', 'time'])
 
 // A path as a shell would resolve it, with forward slashes; a Git Bash path (/c/dev) is a Windows one on Windows.
 export function toPath(p, base, platform = process.platform) {
@@ -139,7 +140,9 @@ export function segments(command, cwd, platform = process.platform) {
     }
     if (c === '&' && next === '>') { endTok(); pendingRedirect = true; i += next === '>' && text[i + 2] === '>' ? 2 : 1; continue }
     if (c === ';' || c === '|' || c === '&' || c === '(' || c === ')') {
+      const piped = c === '|' && next !== '|' && seg.heredoc
       endSeg()
+      if (piped) seg.heredoc = true
       if ((c === '&' || c === '|') && next === c) i++
       continue
     }
@@ -193,7 +196,7 @@ function worktreeFor(repo, target, run, env) {
 const WINDOWS_EDIT = 'On Windows the Bash tool halves a doubled backslash even inside single quotes, and a file may be CRLF on disk, so a scripted edit can wreck it without an error (three fix rounds in one epic): write the file with the Edit or Write tool.'
 
 function check(seg, { run, env, platform }) {
-  const at = seg.argv.findIndex((a) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(a))
+  const at = seg.argv.findIndex((a) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(a) && !WRAPPERS.has(a))
   if (at < 0) return null
   const [first, ...rest] = seg.argv.slice(at)
   const name = bin(first)
@@ -215,18 +218,24 @@ function check(seg, { run, env, platform }) {
     if (sub === 'rebase' && !args.some((a) => ['--abort', '--continue', '--quit', '--skip', '--show-current-patch'].includes(a))) {
       return 'Not run: git rebase. Bring a branch up to date by merging its base (git merge origin/main), as its own commit; a rebase needs a force push, which is refused.'
     }
+    if (sub === 'bisect') {
+      const repo = repoAt(dir, run)
+      if (!repo?.main || ['log', 'visualize', 'view', 'help'].includes(args[0])) return null
+      return `Not run: ${repo.top} is a main clone, and git bisect detaches its HEAD. Bisect in a worktree: ${worktreeFor(repo, null, run, env)}.`
+    }
     if (sub !== 'switch' && sub !== 'checkout') return null
     if (sub === 'checkout' && args.includes('--')) return null
     const flags = args.filter((a) => a.startsWith('-') && a !== '-')
     const target = args.find((a) => !a.startsWith('-') || a === '-')
-    const creates = flags.some((f) => /^(-[bBcC]|--create|--force-create|--orphan|--detach|-d)$/.test(f))
+    const creates = flags.some((f) => /^(-[bBcC]\S*|--create(=.*)?|--force-create(=.*)?|--orphan(=.*)?|--detach|-d)$/.test(f))
     if (!creates && !target) return null
     const repo = repoAt(dir, run)
     if (!repo || !repo.main) return null
     const base = defaultBranch(repo.top, run)
     if (!creates && target === base) return null
     if (sub === 'checkout' && !creates && target !== '-' && !isRef(repo.top, target, run)) return null
-    const branch = creates ? args.find((a, i) => /^(-[bBcC]|--create|--force-create|--orphan)$/.test(args[i - 1] ?? '')) ?? target : target === '-' ? null : target
+    const attached = flags.map((f) => /^(?:-[bBcC]|--create=|--force-create=|--orphan=)(.+)$/.exec(f)?.[1]).find(Boolean)
+    const branch = creates ? attached ?? args.find((a, i) => /^(-[bBcC]|--create|--force-create|--orphan)$/.test(args[i - 1] ?? '')) ?? target : target === '-' ? null : target
     return `Not run: ${repo.top} is a main clone, and git ${sub} ${args.join(' ')} would move it off ${base}. A main clone stays on its default branch (three were left on a branch in one epic, and every sibling reading it went stale). Work in a worktree: ${worktreeFor(repo, branch, run, env)}. To read a file at another ref: git show <ref>:<path>.`
   }
   if (name === 'gh') {
@@ -234,7 +243,8 @@ function check(seg, { run, env, platform }) {
     if (sub === 'pr' && verb === 'merge') {
       return `Not run: gh pr merge. Merge only through the gate, which reads the merge state, the checks on the head and the threads itself: bash "${PLUGIN_ROOT}/scripts/gate.sh" <owner/repo> <pr> --merge. Never --admin.`
     }
-    if (['pr', 'issue', 'run', 'workflow', 'release', 'label', 'cache'].includes(sub) && !rest.some((a) => a === '-R' || a === '--repo' || a.startsWith('--repo=') || /^-R\S/.test(a)) && !rest.includes('--help')) {
+    const named = seg.argv.slice(0, at).some((a) => /^GH_REPO=\S/.test(a))
+    if (['pr', 'issue', 'run', 'workflow', 'release', 'label', 'cache'].includes(sub) && !named && !rest.some((a) => a === '-R' || a === '--repo' || a.startsWith('--repo=') || /^-R\S/.test(a)) && !rest.includes('--help')) {
       return `Not run: gh ${sub} ${verb ?? ''} without -R owner/repo. gh picks the repository from the working directory's remotes, upstream first, and answered about the wrong one four times in one epic: pass -R.`
     }
     return null

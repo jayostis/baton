@@ -46,7 +46,7 @@ const hook = (command, cwd, { tool = 'Bash', env = {} } = {}) => {
 
 test('guard: a main clone is not moved off its default branch, by cwd, cd or git -C; the refusal names the worktree to use', () => {
   const { root, main, wt } = repos()
-  for (const cmd of ['git switch feature', 'git checkout feature', 'git checkout -b x', 'git switch -c x', 'git checkout --detach', 'git checkout -', 'git checkout HEAD~0', 'git switch --detach main']) {
+  for (const cmd of ['git switch feature', 'git checkout feature', 'git checkout -b x', 'git switch -c x', 'git checkout --detach', 'git checkout -', 'git checkout HEAD~0', 'git switch --detach main', 'git switch --create=x', 'git checkout -bx', 'git bisect start', '(cd . && git switch feature)', 'command git switch feature', 'env X=1 git switch feature']) {
     const r = hook(cmd, main)
     assert.equal(r.status, 2, `${cmd} in a main clone`)
     assert.match(r.stderr, /main clone/)
@@ -96,7 +96,8 @@ test('guard: git stash, a forced push, a rebase, gh without -R, a merge outside 
     assert.equal(r.status, 2, cmd)
     assert.match(r.stderr, why, cmd)
   }
-  const passed = ['git stash list', 'git stash show', 'git push origin feature', 'git push -u origin feature', 'git rebase --abort', 'gh pr view 5 -R o/r', 'gh pr view 5 --repo=o/r', 'gh api repos/o/r/pulls', 'gh auth status', 'bash scripts/gate.sh o/r 5 --merge']
+  assert.equal(hook('git bisect start', wt).status, 0, 'a bisect in a worktree')
+  const passed = ['GH_REPO=o/r gh pr view 5', 'git stash list', 'git stash show', 'git push origin feature', 'git push -u origin feature', 'git rebase --abort', 'gh pr view 5 -R o/r', 'gh pr view 5 --repo=o/r', 'gh api repos/o/r/pulls', 'gh auth status', 'bash scripts/gate.sh o/r 5 --merge']
   for (const cmd of passed) assert.equal(hook(cmd, wt).status, 0, cmd)
   assert.equal(hook('npm ci', main).status, 0, 'npm ci belongs in a main clone')
 })
@@ -108,6 +109,8 @@ test('guard: on Windows, sed -i and a heredoc written to a file are refused; a h
   assert.equal(at("cat > f.txt <<'EOF'\na\\\\b\nEOF").block, true)
   assert.equal(at("cat <<'EOF' > f.txt\nx\nEOF").block, true)
   assert.equal(at("tee f.txt <<'EOF'\nx\nEOF").block, true)
+  assert.equal(at("cat <<'EOF' | tee f.txt\nx\nEOF").block, true, 'a heredoc piped into tee')
+  assert.equal(at("cat <<'EOF' | node x.mjs\nx\nEOF").block, false)
   assert.equal(at("git commit -F - <<'EOF'\nx\nEOF").block, false)
   assert.equal(at("node x.mjs <<'EOF' 2>&1\nx\nEOF").block, false)
   assert.equal(at("sed -n '1,5p' f.txt").block, false)

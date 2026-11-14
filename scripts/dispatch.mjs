@@ -49,7 +49,7 @@ function inputProblem(role, entry, input, approved) {
   if (role === 'fix' && local !== null) {
     const n = String(local).split(/\r?\n/).filter((l) => /^\d+[.)]\s/.test(l)).length
     if (n > MAX_FINDINGS) return `the findings file holds ${n} findings; split it into two findings files of at most ${MAX_FINDINGS}, one fix agent each`
-    if (!/^\s*Test:\s*\S/m.test(local)) return 'the findings file has no `Test: <command>` line: the targeted test command, as the repo really runs it'
+    if (!/^\s*(?:Test|Targeted tests?):\s*\S/im.test(local)) return 'the findings file has no `Test: <command>` line: the targeted test command, as the repo really runs it'
     if (!/^\s*Rerun:\s*\S/m.test(local)) return 'the findings file has no `Rerun: <which>` line: which of the reviewer\'s probe results were rerun on the current head (or none)'
   }
   if (entry?.brief === 'builder.md' && local !== null) {

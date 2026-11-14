@@ -14,13 +14,14 @@ import { isMain } from './lib/exec.mjs'
 export function walkItems(text) {
   const out = []
   for (const line of String(text ?? '').split(/\r?\n/)) {
-    const n = /^ {0,3}(\d+)[.)]\s+\S/.exec(line)?.[1]
+    const n = /^(\d+)[.)]\s+\S/.exec(line)?.[1]
     if (n && !out.includes(Number(n))) out.push(Number(n))
   }
   return out
 }
 
-const REPORT = /^\s*(?:[-*+]\s+)?(?:\*\*|__)?(?:item\s+)?(\d+)(?:\*\*|__)?[.):]?(?:\*\*|__)?\s*(?:[-:–—]\s*)?(?:\*\*|__|_)?(not walked|walked)\b/i
+// An item's own line: its number, then anywhere on the line "walked" or "not walked".
+const REPORT = /^\s*(?:[-*+]\s+)?(?:\*\*|__)?(?:item\s+)?(\d+)(?:\*\*|__)?[.):](?:\*\*|__)?\s.*?\b(not walked|walked)\b/i
 
 export function uncovered(inputText, handbackText) {
   const reported = new Set()
