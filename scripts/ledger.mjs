@@ -5,7 +5,7 @@
 //   node ledger.mjs <session-dir> [--since <ISO>] [--until <ISO>] [--json]
 //   node ledger.mjs --project <project-dir> --since <ISO> --until <ISO>      every session in a project folder
 //   node ledger.mjs <session-dir> --waves <waves.json> [--wave <name>]       slice and total by wave
-//   node ledger.mjs <session-dir> --agent <id-or-name-fragment>              one line, for a handback
+//   node ledger.mjs <session-dir> --agent <id-or-name-fragment>              one line, for a handback; for a walk, the walk check under it (exit 1 when it fails)
 //   node ledger.mjs --self [--waves <waves.json>]   one line: this session's last context and, with waves, whether to hand off
 //   node ledger.mjs --all --since <ISO> --until <ISO> --clip                 every session on the machine, cut to the window
 //   node ledger.mjs ... --clip                                                count only turns inside --since/--until
@@ -30,7 +30,8 @@ import { join, basename, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { summarize, mainModel, instant } from './lib/transcript.mjs'
 import { loadRoles, units, show, familyOf } from './lib/roles.mjs'
-import { stepOf, reasonOf } from './lib/steps.mjs'
+import { stepOf, reasonOf, keyOf } from './lib/steps.mjs'
+import { walkOf, verdictLine } from './walk-check.mjs'
 import { timeSplit, transcriptMerges, extraHeavy } from './lib/timing.mjs'
 import { readMachineSection } from './lib/machine.mjs'
 import { timeReport } from './lib/time-report.mjs'
@@ -157,9 +158,10 @@ export function selfSession(cwd, home = homedir()) {
 }
 
 // The orchestrator's own line. Every turn re-reads the last context, so that, not the peak, is what continuing costs; a
-// compaction resets it and the peak stays. With waves, the most recent wave's turn count stands in for the next wave's:
-// handing off would re-read (last - freshSessionTokens) fewer tokens on each of them. Hand off when that saving is at
-// least handoff.minimumUnitsSaved.
+// compaction resets it and the peak stays. With waves, the most recent closed wave's turn count stands in for the next
+// wave's (a wave opened before this ran has no turns yet): handing off would re-read (last - freshSessionTokens) fewer
+// tokens on each of them. Hand off when that saving is at least handoff.minimumUnitsSaved, or when the last context is
+// past twice ceilingTokens, where a longer next wave makes the estimate low.
 export function selfLine(sessionDir, waves = {}, roles = loadRoles(), now = new Date()) {
   const main = `${sessionDir}.jsonl`
   const s = summarize(main)
@@ -169,14 +171,17 @@ export function selfLine(sessionDir, waves = {}, roles = loadRoles(), now = new 
   const head = `orchestrator ${basename(sessionDir)}: last context ${kt(s.lastContext)} (each turn re-reads it), peak ${kt(s.peakContext)}, ${s.turns} turns.`
   const named = Object.entries(waves).sort((a, b) => instant(a[1].from) - instant(b[1].from))
   if (!named.length) return { line: `${head} Pass --waves <file> for the handoff estimate.`, handOff: null, log: null }
-  const [name, wave] = named[named.length - 1]
+  const closed = named.filter(([, w]) => w.to)
+  const [name, wave] = (closed.length ? closed : named).at(-1)
   const turns = summarize(main, { since: wave.from, until: wave.to }).turns
   const { freshSessionTokens, minimumUnitsSaved } = roles.handoff
   const saved = units({ cacheRead: Math.max(0, s.lastContext - freshSessionTokens) * turns }, model, roles)
-  const handOff = saved >= minimumUnitsSaved
+  const pastCeiling = s.lastContext >= 2 * roles.ceilingTokens
+  const handOff = saved >= minimumUnitsSaved || pastCeiling
   return {
     line: `${head} Wave ${name}: ${turns} turns; a fresh session starts near ${kt(freshSessionTokens)}, and over as many turns ` +
-      `would save ${show(saved, roles)}. Hand off at the wave boundary: ${handOff ? 'yes' : 'no'} (threshold ${show(minimumUnitsSaved, roles)}).`,
+      `would save ${show(saved, roles)}. Hand off at the wave boundary: ${handOff ? 'yes' : 'no'} (threshold ${show(minimumUnitsSaved, roles)}` +
+      `${pastCeiling ? `; last context past twice the ${kt(roles.ceilingTokens)} ceiling` : ''}).`,
     handOff,
     log: `handoff-decision at=${now.toISOString()} session=${basename(sessionDir)} wave=${name} last_context=${s.lastContext} turns=${turns} predicted_units=${saved} handed_off=${handOff ? 'yes' : 'no'}`,
   }
@@ -263,7 +268,7 @@ export function inWave(row, wave) {
 export function waveTotals(rows, waves) {
   return Object.entries(waves).map(([name, w]) => {
     const mine = rows.filter((r) => inWave(r, w))
-    return { name, agents: mine.length, units: mine.reduce((n, r) => n + r.units, 0), budget: w.budgetUnits ?? null }
+    return { name, agents: mine.length, units: mine.reduce((n, r) => n + r.units, 0), budget: w.budgetUnits ?? null, to: w.to ?? null }
   })
 }
 
@@ -276,6 +281,9 @@ export function warnings(rows, totals, ceiling, roles = loadRoles()) {
     if (r.agent !== 'orchestrator' && r.peakContext > ceiling) out.push(`${r.agent} (${r.id}) peaked at ${Math.round(r.peakContext / 1000)}k context, past the ${Math.round(ceiling / 1000)}k ceiling`)
   }
   for (const t of totals) if (t.budget && t.units > t.budget) out.push(`wave ${t.name} used ${t.units} units against a budget of ${t.budget}`)
+  const byTo = {}
+  for (const t of totals) if (t.to) (byTo[instant(t.to)] ??= []).push(t.name)
+  for (const names of Object.values(byTo)) if (names.length > 1) out.push(`waves ${names.join(', ')} closed at one instant: close each with its own "to" when its last PR merges, or their totals overlap (three waves once read the same 122.8M)`)
   return out
 }
 
@@ -366,6 +374,14 @@ export function main(args) {
       return 2
     }
     console.log(line)
+    const r = rows.find((x) => matches(x, flag('--agent')))
+    const path = r && !projectDir && !all && agents(target).find((p) => basename(p) === `agent-${r.id}.jsonl`)
+    if (path && keyOf(r.agent) === 'walk') {
+      const w = walkOf(path)
+      const v = w.input && existsSync(w.input) ? verdictLine(readFileSync(w.input, 'utf8'), w.handback ?? '') : { ok: false, line: `cannot read its input, ${w.input ?? 'no line 3 on its prompt'}` }
+      console.log(`walk check: ${v.line}`)
+      return v.ok ? 0 : 1
+    }
     return 0
   }
   if (timed) {

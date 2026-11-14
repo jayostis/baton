@@ -22,7 +22,7 @@ Report exactly one, as the final line:
 
 ## Blocking — escalate to GitHub
 
-`gh issue comment N` **@mentioning the escalation target**, then `gh issue edit N --add-label
+`gh issue comment N -R <owner/repo>` **@mentioning the escalation target**, then `gh issue edit N -R <owner/repo> --add-label
 ${user_config.escalation_label}` (default `needs-human`). The label does not notify; the mention
 is what reaches a person.
 
@@ -30,8 +30,8 @@ is what reaches a person.
 them → the issue's author → `${user_config.maintainer_handle}`.
 
 ```bash
-gh issue view N --json assignees --jq '[.assignees[] | select(.is_bot | not) | .login]'
-gh issue view N --json author --jq .author.login
+gh issue view N -R <owner/repo> --json assignees --jq '[.assignees[] | select(.is_bot | not) | .login]'
+gh issue view N -R <owner/repo> --json author --jq .author.login
 ```
 
 **A chain yielding nobody still blocks** — comment, label, and say no owner was identified.
@@ -47,12 +47,12 @@ question, and **what each answer implies for the work**.
 first — a block posts the branch, the head SHA and what each answer implies.
 
 **GitHub is the record; this machine is a cache.** Never conclude "no progress" from local state
-until `git ls-remote` and `gh pr list` agree. Start from the first step whose output is genuinely
+until `git ls-remote` and `gh pr list -R <owner/repo>` agree. Start from the first step whose output is genuinely
 missing.
 
 ## Steps
 
-**1 — Verify the issue.** `gh issue view N --json labels,title,body,assignees,author`.
+**1 — Verify the issue.** `gh issue view N -R <owner/repo> --json labels,title,body,assignees,author`.
 
 `needs-rework` → **block.** No positive label is required; the conformance pass is the gate, not a
 badge somebody remembered to apply. Then [`/baton:issue review <N>`](../issue/review.md) — **block
@@ -108,10 +108,10 @@ block**, verbatim.
 `git log origin/<work branch>`. **A tool error proves nothing either way**: an agent can error
 after writing every file, so the repo is the witness and the report is not.
 
-**6 — Draft PR.** `gh pr list --head <work branch> --state open` first — `gh pr create` errors
+**6 — Draft PR.** `gh pr list -R <owner/repo> --head <work branch> --state open` first — `gh pr create -R <owner/repo>` errors
 when one exists, and on a resumed delivery it will. Found one → adopt it, and read its body,
-reviews and commits; that thread is the handover. Otherwise `gh pr create --draft --base
-<integration branch>` with `Closes #N` in the body. **Leave it a draft** — `gh pr ready` is
+reviews and commits; that thread is the handover. Otherwise `gh pr create -R <owner/repo> --draft --base
+<integration branch>` with `Closes #N` in the body. **Leave it a draft** — `gh pr ready <pr> -R <owner/repo>` is
 step 9's.
 
 **7 — Review loop.** [`/baton:pr loop <pr>`](../pr/loop.md), one fix round. Branch on its exit line and
@@ -122,6 +122,6 @@ nothing else: `unfixed` or `blocked` → **block**, verbatim. `clean`, `stalled`
 **Anything it reports as declared but absent → block** — this is the only step that compares what
 the issue asked for against what the branch holds.
 
-**9 — Ready, then report.** `gh pr ready`, then [`/baton:pr status <pr>`](../pr/status.md). **Its
+**9 — Ready, then report.** `gh pr ready <pr> -R <owner/repo>`, then [`/baton:pr status <pr>`](../pr/status.md). **Its
 four lines are your report — verbatim, whatever they say**, then the exit state. Running the verbs
 it names is the maintainer's call. Never merge.

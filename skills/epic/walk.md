@@ -1,8 +1,9 @@
 # Walk
 
 The epic's PRs are merged. You use what shipped, the way a person would, because tests did not find the defects the
-walks of earlier epics found. Prompt lines: 1 the epic, 2 this file, 4 the plugin root, 5 the project config. Read this, the epic's issues (each "Done when"), and the `[walk]` and `[all]` lines of
-`references/lessons.md`.
+walks of earlier epics found. Prompt lines: 1 the epic, 2 this file, 3 the input, a numbered list of what to walk, 4 the
+plugin root, 5 the project config. Read this, the input, the epic's issues (each "Done when"), and the `[walk]` and
+`[all]` lines of `references/lessons.md`.
 
 - Be alone on the machine: no other agent is running. The orchestrator guarantees it; if you see one, stop.
 - Start from a clean checkout of each merged branch, built the way a user builds it. Not your worktree.
@@ -15,5 +16,6 @@ walks of earlier epics found. Prompt lines: 1 the epic, 2 this file, 4 the plugi
   "Done when" and a one-line cause if you have one. Do not fix anything.
 - Count them: the retro records defects found by the walk.
 
-Return the list of issues filed, the count, and what you could not walk and why. Then the block in
-`references/handback.md`.
+Return every numbered item of the input on a line of its own, `<n>. walked: <what you saw>` or
+`<n>. not walked: <why>` (a hook holds the handback until each is there; `scripts/walk-check.mjs` is the check), then
+the issues filed and the count. Then the block in `references/handback.md`.

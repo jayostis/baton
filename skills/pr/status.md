@@ -21,7 +21,7 @@ Say it that way.
 Every thread resolved is **not** the same as reviewed: `followup` resolves threads *and pushes
 fixes*, so the tidiest apply leaves every thread closed and a head carrying code nobody read.
 
-**CI** — the run for `gh pr view <pr> --json headRefOid`. Report its state and **infer no cause**.
+**CI** — the run for `gh pr view <pr> -R <owner/repo> --json headRefOid`. Report its state and **infer no cause**.
 Two results that are neither green nor a failure: every job `skipped`, and no run at all. Report
 each as what it is; the project's triggers are not yours to guess.
 
@@ -36,7 +36,7 @@ One line each, and **each names the verb that clears it**:
 #42  fix/123-example → main   draft
 Threads     2 unresolved · /baton:pr followup 42
 Review      last pass saw 641bfe2, head is 0bda506 · /baton:pr review 42
-CI          every job skipped · gh pr ready 42
+CI          every job skipped · gh pr ready 42 -R o/r
 Checkboxes  1 of 2 ticked · yours
 ```
 

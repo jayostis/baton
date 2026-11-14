@@ -81,6 +81,10 @@ test('a wave totals the agents whose first turn falls inside it, and a wave over
   const totals = waveTotals(rows, { w1: { from: '2026-10-10T00:00:00Z', to: '2026-10-11T00:00:00Z', budgetUnits: 1 }, w2: { from: '2026-10-11T00:00:00Z' } })
   assert.deepEqual(totals.map((t) => [t.name, t.agents]), [['w1', 1], ['w2', 2]])  // w2 is open-ended and holds agent b and the orchestrator (turn on 2026-10-30)
   assert.match(warnings(rows, totals, 200000)[0], /wave w1 used \d+ units against a budget of 1/)
+  const shut = waveTotals(rows, { w1: { from: '2026-10-10T00:00:00Z', to: '2026-10-13T00:00:00Z' }, w2: { from: '2026-10-11T00:00:00Z', to: '2026-10-13T00:00:00Z' }, w3: { from: '2026-10-12T00:00:00Z', to: '2026-10-14T00:00:00Z' } })
+  const same = warnings(rows, shut, 200000).filter((w) => /closed at one instant/.test(w))
+  assert.equal(same.length, 1, 'one warning for the two waves that share a "to"')
+  assert.match(same[0], /waves w1, w2 closed at one instant/)
 })
 
 test('an agent past the context ceiling warns; the orchestrator does not', () => {
@@ -234,6 +238,11 @@ test('selfLine reads the last context, not the peak, and hands off when the last
   assert.equal(none.handOff, null)
   assert.match(none.line, /--waves/)
   assert.equal(selfLine(join(project, 'absent'), waves, R(1)), null)
+  const opened = { ...waves, w2: { from: '2026-10-30T11:00:00Z' } }
+  assert.match(selfLine(dir, opened, R(144_000)).line, /Wave w1: 3 turns/, 'a wave opened before --self ran is not the estimate')
+  const past = selfLine(dir, waves, { ...R(10 ** 9), ceilingTokens: 150_000 })
+  assert.equal(past.handOff, true)
+  assert.match(past.line, /past twice the 150k ceiling/)
 })
 
 test('allLedger reads every project folder, and with clip counts only the turns inside the window', () => {

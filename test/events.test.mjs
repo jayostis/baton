@@ -254,6 +254,7 @@ test('a fix round\'s reason is the word after its step key; a findings file open
   assert.equal(reasonOf('fix: w2 s06d round 2'), 'other')
   assert.equal(reasonOf('fix: no step here test'), 'other')
   assert.equal(stepOf('fix: w3 s07b words'), 'w3 s07b')
+  assert.equal(stepOf('builder: w10 s12b2 part 2'), 'w10 s12b2')
   assert.equal(reasonFromFindings('Reason: Conflict\n\n1. x'), 'conflict')
   assert.equal(reasonFromFindings('Reason: because\n'), 'other')
   assert.equal(reasonFromFindings('# findings\n1. x'), null)
@@ -302,11 +303,12 @@ test('dispatch.mjs leaves lines 4 and 5 of a cold-read blank, takes a fix round\
   assert.equal(c.lines[0], 'the page text')
   assert.ok(c.lines[1].endsWith('/notes/cold.md'))
   assert.ok(c.lines[2].endsWith('/notes/page.txt'))
+  assert.equal(dispatch({ role: 'builder', step: 'w7 #777', subject: 'x', input: 'https://github.com/o/r/issues/777' }, { env }).lines[2], 'https://github.com/o/r/issues/777')
   assert.equal(c.lines[3], '')
   assert.equal(c.lines[4], '')
   assert.equal(c.model, null, 'a cold-read is not in the role table: the model is the project\'s call')
   const findings = join(tmp(), 'findings.md')
-  writeFileSync(findings, 'Reason: ci-red\n\n1. a\n')
+  writeFileSync(findings, 'Reason: ci-red\nTest: npm test -- a.test.ts\nRerun: probe 1 rerun on abc1234\n\n1. a\n')
   const f = dispatch({ role: 'fix', step: 'w3 s07b', subject: 'jayostis/r#9 three findings', input: findings }, { env })
   assert.match(f.description, /^fix: w3 s07b ci-red jayostis\/r#9/)
   assert.equal(reasonOf(f.description), 'ci-red')
@@ -315,6 +317,7 @@ test('dispatch.mjs leaves lines 4 and 5 of a cold-read blank, takes a fix round\
   assert.match(none.description, /^fix: w3 s07b other /)
   assert.match(none.notes[0], /Reason:/)
   assert.throws(() => dispatch({ role: 'builder', step: 'w3', subject: 'x' }, { env }), /not a wave and a step/)
+  assert.match(dispatch({ role: 'builder', step: 'w10 s12b2', subject: 'part 2' }, { env }).description, /^builder: w10 s12b2 part 2/)
   assert.throws(() => dispatch({ role: 'nobody', step: 'w3 s07b', subject: 'x' }, { env }), /unknown role/)
   assert.throws(() => dispatch({ role: 'builder', step: 'w3 s07b', subject: 'x' }, { env: {}, cwd: tmp() }), /no project config/)
   const sharpen = dispatch({ role: 'sharpen', step: 'w1 s00', subject: 'the top sink' }, { env })
@@ -323,6 +326,40 @@ test('dispatch.mjs leaves lines 4 and 5 of a cold-read blank, takes a fix round\
   assert.equal(cli.status, 0)
   assert.match(cli.stdout, /^description: builder: w1 s01 sub\nmodel: sonnet\neffort: high\n---\n1\. sub\n2\. /)
   assert.equal(spawnSync(process.execPath, [script('dispatch.mjs'), 'builder', 'nope', 'sub'], { env: { ...process.env, ...env } }).status, 2)
+})
+
+test('dispatch.mjs refuses a findings file past ten findings or without its Test and Rerun lines, and a step file that cites a line number', () => {
+  const env = { BATON_PROJECT_CONFIG: config() }
+  const file = (text) => { const p = join(tmp(), 'f.md'); writeFileSync(p, text); return p }
+  const head = 'Reason: review\nTest: node --test test/a.test.mjs\nRerun: none of the probes; the head moved\n\n'
+  const items = (n) => Array.from({ length: n }, (_, i) => `${i + 1}. finding ${i + 1}\n   quoted: "x"\n`).join('')
+  assert.equal(dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file(head + items(10)) }, { env }).lines.length, 5)
+  assert.throws(() => dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file(head + items(11)) }, { env }), /11 findings.*split/)
+  assert.throws(() => dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file('Reason: review\nRerun: none\n\n1. a\n') }, { env }), /Test:/)
+  assert.throws(() => dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file('Reason: review\nTest: x\n\n1. a\n') }, { env }), /Rerun:/)
+  assert.equal(dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file('Reason: review\n\nTargeted tests: node --test a.test.js\nRerun: none\n\n1. a\n') }, { env }).lines.length, 5, 'the form findings files already use')
+  assert.throws(() => dispatch({ role: 'builder', step: 'w1 s01', subject: 'x', input: file('Change scripts/gate.sh:42 and lib/a.ts:7.\n') }, { env }), /line number.*gate\.sh:42/)
+  assert.equal(dispatch({ role: 'builder', step: 'w1 s01', subject: 'x', input: file('Change `wait()` in scripts/gate.sh; 10:30 is a time.\n') }, { env }).lines.length, 5)
+  assert.equal(dispatch({ role: 'fix', step: 'w1 s01', subject: 'x', input: file(head + '1. scripts/gate.sh:42 is wrong\n') }, { env }).lines.length, 5, 'a finding may quote the reviewer\'s file:line')
+})
+
+test('dispatch.mjs: a step file of kind page needs --approved, the text the maintainer approved, which it puts on the prompt', () => {
+  const env = { BATON_PROJECT_CONFIG: config() }
+  const dir = tmp()
+  const step = join(dir, 'step.md')
+  writeFileSync(step, '# Status page\nkind: page\n\nDraft the status page.\n')
+  assert.throws(() => dispatch({ role: 'builder', step: 'w2 s05', subject: 'status page', input: step }, { env }), /kind: page.*--approved/)
+  assert.throws(() => dispatch({ role: 'builder', step: 'w2 s05', subject: 'status page', input: step, approved: join(dir, 'missing.md') }, { env }), /--approved/)
+  const approved = join(dir, 'approved.md')
+  writeFileSync(approved, 'The story, the audience.\n')
+  const d = dispatch({ role: 'builder', step: 'w2 s05', subject: 'status page', input: step, approved }, { env })
+  assert.equal(d.approved, approved.replace(/\\/g, '/'))
+  assert.match(render(d), /\napproved: .*approved\.md$/)
+  const plain = join(dir, 'plain.md')
+  writeFileSync(plain, '# A script\n\nThe kind: page word in prose is not a declaration.\n')
+  assert.equal(dispatch({ role: 'builder', step: 'w2 s06', subject: 'x', input: plain }, { env }).approved, null)
+  const cli = spawnSync(process.execPath, [script('dispatch.mjs'), 'builder', 'w2 s05', 'status page', '--input', step, '--approved', approved], { env: { ...process.env, ...env }, encoding: 'utf8' })
+  assert.equal(cli.status, 0, cli.stderr)
 })
 
 // ---- heavy.sh's events

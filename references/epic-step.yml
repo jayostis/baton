@@ -40,6 +40,11 @@ body:
       description: What a person can do or see, in the real surface. The walk drives these.
     validations:
       required: true
+  - type: input
+    id: kind
+    attributes:
+      label: Kind
+      description: "kind: page for a step that drafts a page or its copy; dispatch.mjs then needs --approved <file>, the story and audience the maintainer approved. Otherwise leave empty."
   - type: textarea
     id: role
     attributes:
