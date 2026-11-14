@@ -5,7 +5,8 @@
 // written for 90 minutes (scripts/lib/machine.mjs). A fresh session starts with none. On a resume of the same session
 // the agents a restart killed have no `finished` either, so they count until their 90 quiet minutes are up.
 //
-// One agent whose description key is `sharpen` runs past the caps. The hook fails open: any error reading or parsing
+// A heavy agent for a step (the wave and step key of its description) whose heavy agent is still writing is refused,
+// whatever the caps. One agent whose description key is `sharpen` runs past the caps. The hook fails open: any error reading or parsing
 // lets the dispatch through and says so on stderr. It also refreshes the limits file heavy.sh reads, and when a pace flag
 // is up (scripts/lib/pace-warning.mjs) adds up to three lines of context for this dispatch: it warns, never blocks, and
 // says nothing when it cannot read the data.
@@ -14,18 +15,29 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { loadRoles } from './lib/roles.mjs'
-import { keyOf } from './lib/steps.mjs'
+import { keyOf, stepOf } from './lib/steps.mjs'
 import { inEpic } from './epic-mode.mjs'
 import { paceWarning } from './lib/pace-warning.mjs'
 import { limits, readMachineSection, machineOff, weightOf, runningAgents, writeLimitsFile } from './lib/machine.mjs'
 
 const minutes = (ms) => `${Math.round(ms / 60000)} min`
+// A heavy agent whose transcript was written this recently is alive: a second heavy agent on its step is refused. A live
+// Opus builder was once duplicated; two builders taken for lost had left their work on their branch and worktree.
+export const SAME_STEP_QUIET_MS = 15 * 60 * 1000
 
 // `running` is what runningAgents returns. Returns whether to block and why.
 export function verdict(input, { env = process.env, epic = inEpic(input.session_id, env), running = [], lim = limits({ env }), roles = loadRoles() } = {}) {
   if (input.tool_name !== 'Agent' || machineOff(env) || !epic) return { block: false }
   const description = String(input.tool_input?.description || '').trim()
   const weight = weightOf(description, roles)
+  const step = stepOf(description)
+  const twin = step && weight === 'heavy' && running.find((a) => a.weight === 'heavy' && stepOf(a.description) === step && (a.quietMs ?? 0) < SAME_STEP_QUIET_MS)
+  if (twin) {
+    return {
+      block: true,
+      reason: `Not dispatched: ${twin.description} is still working on ${step} (quiet ${minutes(twin.quietMs ?? 0)}). One agent per branch: a CI red or a second review for it goes to that agent by SendMessage. If it is dead (a login error, a killed run), its transcript has stopped: once it has been quiet ${SAME_STEP_QUIET_MS / 60000} minutes this dispatch passes, and the new agent is told to continue from its worktree and its pushed branch.`,
+    }
+  }
   if (keyOf(description) === 'sharpen' && !running.some((a) => keyOf(a.description) === 'sharpen')) return { block: false }
   const same = running.filter((a) => a.weight === weight && keyOf(a.description) !== 'sharpen')
   const cap = weight === 'heavy' ? lim.heavy_agents : lim.light_agents

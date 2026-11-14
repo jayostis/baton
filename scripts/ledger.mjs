@@ -5,7 +5,7 @@
 //   node ledger.mjs <session-dir> [--since <ISO>] [--until <ISO>] [--json]
 //   node ledger.mjs --project <project-dir> --since <ISO> --until <ISO>      every session in a project folder
 //   node ledger.mjs <session-dir> --waves <waves.json> [--wave <name>]       slice and total by wave
-//   node ledger.mjs <session-dir> --agent <id-or-name-fragment>              one line, for a handback
+//   node ledger.mjs <session-dir> --agent <id-or-name-fragment>              one line, for a handback; for a walk, the walk check under it (exit 1 when it fails)
 //   node ledger.mjs --self [--waves <waves.json>]   one line: this session's last context and, with waves, whether to hand off
 //   node ledger.mjs --all --since <ISO> --until <ISO> --clip                 every session on the machine, cut to the window
 //   node ledger.mjs ... --clip                                                count only turns inside --since/--until
@@ -30,7 +30,8 @@ import { join, basename, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { summarize, mainModel, instant } from './lib/transcript.mjs'
 import { loadRoles, units, show, familyOf } from './lib/roles.mjs'
-import { stepOf, reasonOf } from './lib/steps.mjs'
+import { stepOf, reasonOf, keyOf } from './lib/steps.mjs'
+import { walkOf, verdictLine } from './walk-check.mjs'
 import { timeSplit, transcriptMerges, extraHeavy } from './lib/timing.mjs'
 import { readMachineSection } from './lib/machine.mjs'
 import { timeReport } from './lib/time-report.mjs'
@@ -267,7 +268,7 @@ export function inWave(row, wave) {
 export function waveTotals(rows, waves) {
   return Object.entries(waves).map(([name, w]) => {
     const mine = rows.filter((r) => inWave(r, w))
-    return { name, agents: mine.length, units: mine.reduce((n, r) => n + r.units, 0), budget: w.budgetUnits ?? null }
+    return { name, agents: mine.length, units: mine.reduce((n, r) => n + r.units, 0), budget: w.budgetUnits ?? null, to: w.to ?? null }
   })
 }
 
@@ -280,6 +281,9 @@ export function warnings(rows, totals, ceiling, roles = loadRoles()) {
     if (r.agent !== 'orchestrator' && r.peakContext > ceiling) out.push(`${r.agent} (${r.id}) peaked at ${Math.round(r.peakContext / 1000)}k context, past the ${Math.round(ceiling / 1000)}k ceiling`)
   }
   for (const t of totals) if (t.budget && t.units > t.budget) out.push(`wave ${t.name} used ${t.units} units against a budget of ${t.budget}`)
+  const byTo = {}
+  for (const t of totals) if (t.to) (byTo[instant(t.to)] ??= []).push(t.name)
+  for (const names of Object.values(byTo)) if (names.length > 1) out.push(`waves ${names.join(', ')} closed at one instant: close each with its own "to" when its last PR merges, or their totals overlap (three waves once read the same 122.8M)`)
   return out
 }
 
@@ -370,6 +374,14 @@ export function main(args) {
       return 2
     }
     console.log(line)
+    const r = rows.find((x) => matches(x, flag('--agent')))
+    const path = r && !projectDir && !all && agents(target).find((p) => basename(p) === `agent-${r.id}.jsonl`)
+    if (path && keyOf(r.agent) === 'walk') {
+      const w = walkOf(path)
+      const v = w.input && existsSync(w.input) ? verdictLine(readFileSync(w.input, 'utf8'), w.handback ?? '') : { ok: false, line: `cannot read its input, ${w.input ?? 'no line 3 on its prompt'}` }
+      console.log(`walk check: ${v.line}`)
+      return v.ok ? 0 : 1
+    }
     return 0
   }
   if (timed) {
