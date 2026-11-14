@@ -25,6 +25,21 @@ export function machineSection(text) {
   return out
 }
 
+// The first command of a project config section (`## worktree`, `## review_worktree`): an indented line or a fenced one.
+export function sectionCommand(text, name) {
+  let inside = false
+  let fenced = false
+  for (const line of String(text).split('\n')) {
+    const heading = /^#{1,6}\s*(.*?)\s*$/.exec(line)
+    if (heading && !fenced) { inside = heading[1].toLowerCase() === name; continue }
+    if (!inside) continue
+    if (/^\s*```/.test(line)) { fenced = !fenced; continue }
+    const code = fenced ? line.trim() : /^(?: {4}|\t)(\S.*)$/.exec(line)?.[1]
+    if (code) return code
+  }
+  return null
+}
+
 export function projectConfigPath(env = process.env, cwd = process.cwd()) {
   const named = env.BATON_PROJECT_CONFIG || env.CLAUDE_PLUGIN_OPTION_PROJECT_CONFIG
   if (named) return named

@@ -19,7 +19,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadRoles } from './lib/roles.mjs'
-import { projectConfigPath } from './lib/machine.mjs'
+import { projectConfigPath, sectionCommand } from './lib/machine.mjs'
 import { stepOf, reasonFromFindings } from './lib/steps.mjs'
 
 export const PLUGIN_ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\\/g, '/').replace(/\/$/, '')
@@ -27,20 +27,11 @@ const slash = (p) => resolve(p).replace(/\\/g, '/')
 // An issue or PR given by its URL is passed as it is; resolve() made it a path under the working directory.
 const inputLine = (p) => (/^https?:\/\//.test(p) ? p : slash(p))
 
-// The first indented command of the `## review_worktree` section, or a fenced one.
+// The first command of the `## review_worktree` section, with the slot filled in.
 export function reviewCall(configText, slot) {
-  let inside = false
-  let fenced = false
-  for (const line of String(configText).split('\n')) {
-    const heading = /^#{1,6}\s*(.*?)\s*$/.exec(line)
-    if (heading && !fenced) { inside = heading[1].toLowerCase() === 'review_worktree'; continue }
-    if (!inside) continue
-    if (/^\s*```/.test(line)) { fenced = !fenced; continue }
-    const code = fenced ? line.trim() : /^(?: {4}|\t)(\S.*)$/.exec(line)?.[1]
-    if (!code) continue
-    return slot === undefined ? code : code.replace(/\[--slot <n>\]/, `--slot ${slot}`).replace(/--slot <n>/, `--slot ${slot}`)
-  }
-  return null
+  const code = sectionCommand(configText, 'review_worktree')
+  if (!code || slot === undefined) return code
+  return code.replace(/\[--slot <n>\]/, `--slot ${slot}`).replace(/--slot <n>/, `--slot ${slot}`)
 }
 
 export function dispatch({ role, step, subject, input, slot, brief }, { roles = loadRoles(), env = process.env, cwd = process.cwd() } = {}) {

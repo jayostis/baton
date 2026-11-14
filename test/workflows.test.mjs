@@ -42,6 +42,10 @@ jobs:
   deploy:
     needs: pages
     runs-on: ubuntu-latest
+  live:
+    needs: pages
+    if: \${{ !cancelled() && needs.pages.outputs.deployed == 'true' }}
+    runs-on: ubuntu-latest
   release:
     if: >-
       github.event_name == 'push' &&
@@ -87,7 +91,7 @@ test('parseWorkflow reads the triggers and each job\'s name, if and needs, not a
   const w = parseWorkflow(CHECK)
   assert.deepEqual(Object.keys(w.on).sort(), ['pull_request', 'push', 'schedule'])
   assert.deepEqual(w.on.push.branches, ['main'])
-  assert.deepEqual(w.jobs.map((j) => j.id), ['tests', 'build-pages', 'pages', 'deploy', 'release', 'publish', 'starter', 'nightly-only'])
+  assert.deepEqual(w.jobs.map((j) => j.id), ['tests', 'build-pages', 'pages', 'deploy', 'live', 'release', 'publish', 'starter', 'nightly-only'])
   const by = Object.fromEntries(w.jobs.map((j) => [j.id, j]))
   assert.equal(by.tests.name, 'tests and conformance')
   assert.equal(by.tests.if, "github.event_name != 'push'")
@@ -113,7 +117,7 @@ test('evaluate is three-valued: what the PR context cannot know stays unknown', 
 test('mainOnlyJobs names the jobs the PR never runs and main will, through needs, and whole workflows without a PR trigger', () => {
   const got = mainOnlyJobs([{ file: 'check.yml', text: CHECK }, { file: 'nightly.yml', text: NIGHTLY }, { file: 'ready.yml', text: PR_ONLY }, { file: 'tags.yml', text: TAGS }], { base: 'main' })
   assert.deepEqual(got.map((j) => `${j.file}: ${j.id}`), [
-    'check.yml: build-pages', 'check.yml: pages', 'check.yml: deploy', 'check.yml: release', 'check.yml: nightly-only', 'nightly.yml: sweep',
+    'check.yml: build-pages', 'check.yml: pages', 'check.yml: deploy', 'check.yml: live', 'check.yml: release', 'check.yml: nightly-only', 'nightly.yml: sweep',
   ])
   assert.deepEqual(mainOnlyJobs([{ file: 'check.yml', text: CHECK }], { base: 'alpha/x', defaultBranch: 'main' }), [], 'a push to a branch the workflow does not name runs nothing, and a schedule runs the default branch')
   assert.deepEqual(mainOnlyJobs([{ file: 'bad.yml', text: ':\n  - [' }], { base: 'main' }), [], 'an unreadable file names nothing')
@@ -127,6 +131,6 @@ test('main-only.mjs prints one line per job, from files on disk', () => {
   const r = spawnSync(process.execPath, [script, '--base', 'main', join(dir, 'check.yml'), join(dir, 'ready.yml')], { encoding: 'utf8' })
   assert.equal(r.status, 0, r.stderr)
   assert.equal(r.stdout.trim().split('\n')[0], 'check.yml: build-pages')
-  assert.equal(r.stdout.trim().split('\n').length, 5)
+  assert.equal(r.stdout.trim().split('\n').length, 6)
   assert.equal(spawnSync(process.execPath, [script, '--base', 'main'], { encoding: 'utf8' }).stdout, '', 'no files, no lines')
 })

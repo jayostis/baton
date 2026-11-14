@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
 # The merge gate for one PR, checked rather than taken from a report:
 # head, merge state, every check on the current head, unresolved review threads.
-#   gate.sh <owner/repo> <pr> [--merge] [--allow <check name>]...
+#   gate.sh <owner/repo> <pr> [--merge [--wait-main]] [--allow <check name>]...
 # Prints the verdict; with --merge, merges (merge commit) only when the gate passes. Never bypasses a BLOCKED,
 # UNKNOWN or BEHIND PR. --allow names a check (by name prefix) that may be red; use it only for a check another repo's PR
 # turns green, which the PR body names. Any check not named must succeed or be skipped.
+# It names the jobs the PR never ran because they run on the base branch only (scripts/main-only.mjs, from the
+# workflows at the PR's head). After a merge it prints the wait-ci.sh line for the base's new head, names any main clone
+# beside this one that is off its default branch and fast-forwards the merged repo's clone (scripts/clones.mjs). With
+# --wait-main and such jobs, it waits on the new head itself: exit 3 when it is red, the merge done.
 set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/lib/events.sh"
 repo=${1:-}; pr=${2:-}
-if [[ "$repo" != */* || -z "$pr" ]]; then echo "usage: gate.sh <owner/repo> <pr> [--merge] [--allow <check name>]..." >&2; exit 2; fi
+if [[ "$repo" != */* || -z "$pr" ]]; then echo "usage: gate.sh <owner/repo> <pr> [--merge [--wait-main]] [--allow <check name>]..." >&2; exit 2; fi
 shift 2
-merge=""; allowed=()
+merge=""; waitmain=""; allowed=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --merge) merge=1 ;;
+    --wait-main) waitmain=1 ;;
     --allow) allowed+=("${2:?--allow needs a check name}"); shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -38,7 +43,15 @@ unallowed=$(printf '%s\n' "$bad" | while IFS=$'\t' read -r st nm; do
   [ -z "$ok" ] && printf '%s %s\n' "$st" "$nm"
 done)
 threads=$(gh api graphql -f query="{repository(owner:\"$owner\",name:\"$name\"){pullRequest(number:$pr){reviewThreads(first:100){nodes{isResolved}}}}}" -q '[.data.repository.pullRequest.reviewThreads.nodes[]|select(.isResolved|not)]|length')
+wfdir=$(mktemp -d)
+default=$(gh repo view -R "$repo" --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null)
+for p in $(gh api "repos/$repo/contents/.github/workflows?ref=$head" -q '.[]|select(.type=="file")|.path' 2>/dev/null); do
+  case "$p" in *.yml|*.yaml) gh api -H 'Accept: application/vnd.github.raw+json' "repos/$repo/contents/$p?ref=$head" > "$wfdir/${p##*/}" 2>/dev/null ;; esac
+done
+mainonly=$(node "$here/main-only.mjs" --base "$base" --default "${default:-$base}" "$wfdir"/*.y*ml 2>/dev/null)
+rm -rf "$wfdir"
 echo "$repo#$pr -> $base  head $head  state $state  unresolved threads $threads"
+[ -n "$mainonly" ] && { echo "jobs this PR never ran (they run on $base only):"; printf '%s\n' "$mainonly"; }
 [ -z "$(gh pr checks "$pr" -R "$repo" --json name -q '.[]|.name')" ] && echo "no checks on head"
 [ -n "$bad" ] && { echo "checks not passing:"; printf '%s\n' "$bad"; }
 [ ${#allowed[@]} -gt 0 ] && echo "allowed red: ${allowed[*]}"
@@ -52,6 +65,13 @@ if [ -n "$okstate" ] && [ -z "$pending" ] && [ -z "$unallowed" ] && [ "$threads"
     gh pr merge "$pr" -R "$repo" --merge || { echo "MERGE FAILED: gh pr merge exited non-zero for $repo#$pr" >&2; exit 1; }
     echo "merged"
     ev merge repo="$repo" pr="$pr" head="$head"
+    sha=$(gh pr view "$pr" -R "$repo" --json mergeCommit -q .mergeCommit.oid 2>/dev/null)
+    echo "$base's new head: bash $here/wait-ci.sh $repo --commit ${sha:-<sha>}"
+    node "$here/clones.mjs" --pull "$repo" 2>/dev/null
+    if [ -n "$waitmain" ] && [ -n "$mainonly" ] && [ -n "$sha" ]; then
+      bash "$here/wait-ci.sh" "$repo" --commit "$sha" || { echo "MAIN NOT PASSING: $base at $sha is red after the merge, on jobs this PR never ran"; exit 3; }
+      echo "$base passed on $sha"
+    fi
   fi
   exit 0
 fi
